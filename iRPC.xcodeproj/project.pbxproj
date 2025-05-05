@@ -6,7 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F49296B22DC9520600FA24D8 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = F49296B12DC9520600FA24D8 /* README.md */; };
+		F4BE1C502DC94B49009B622C /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = F4BE1C4F2DC94B49009B622C /* LaunchAtLogin */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		F49296B12DC9520600FA24D8 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		F4BE1C312DC94AD5009B622C /* iRPC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iRPC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -23,6 +29,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F4BE1C502DC94B49009B622C /* LaunchAtLogin in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -32,6 +39,7 @@
 		F4BE1C282DC94AD5009B622C = {
 			isa = PBXGroup;
 			children = (
+				F49296B12DC9520600FA24D8 /* README.md */,
 				F4BE1C332DC94AD5009B622C /* iRPC */,
 				F4BE1C322DC94AD5009B622C /* Products */,
 			);
@@ -65,6 +73,7 @@
 			);
 			name = iRPC;
 			packageProductDependencies = (
+				F4BE1C4F2DC94B49009B622C /* LaunchAtLogin */,
 			);
 			productName = iRPC;
 			productReference = F4BE1C312DC94AD5009B622C /* iRPC.app */;
@@ -94,6 +103,9 @@
 			);
 			mainGroup = F4BE1C282DC94AD5009B622C;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F4BE1C4E2DC94B49009B622C /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F4BE1C322DC94AD5009B622C /* Products */;
 			projectDirPath = "";
@@ -109,6 +121,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F49296B22DC9520600FA24D8 /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -258,6 +271,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "iRPC - Imagine an RPC";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -285,6 +300,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "iRPC - Imagine an RPC";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -321,6 +338,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F4BE1C4E2DC94B49009B622C /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sindresorhus/LaunchAtLogin-Modern";
+			requirement = {
+				kind = exactVersion;
+				version = 1.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F4BE1C4F2DC94B49009B622C /* LaunchAtLogin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F4BE1C4E2DC94B49009B622C /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */;
+			productName = LaunchAtLogin;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F4BE1C292DC94AD5009B622C /* Project object */;
 }
