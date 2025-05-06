@@ -175,7 +175,7 @@ class SettingsManager: ObservableObject {
                     let newValue = self.kvStore.bool(forKey: key, withDefaultValue: true)
                     if self.enableCompanionApp != newValue {
                         self.enableCompanionApp = newValue
-                        print("[SettingsManager] Updated enableCoimpanionApp from iCloud: \(newValue)")
+                        print("[SettingsManager] Updated enableCompanionApp from iCloud: \(newValue)")
                     }
                 default:
                     // Ignore keys not managed by this class.
