@@ -11,6 +11,8 @@ import LaunchAtLogin
 // Shared notification name used to trigger a presence update, e.g., when settings change.
 extension Notification.Name {
     static let refreshDiscordPresence = Notification.Name("refreshDiscordPresenceNotification")
+    static let startCompanionServer = Notification.Name("startCompanionServerNotification")
+    static let stopCompanionServer = Notification.Name("stopCompanionServerNotification")
 }
 
 /// The SwiftUI view displayed within the menu bar popover.
@@ -103,6 +105,18 @@ struct MenuContentView: View {
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 1)
+            
+            Toggle("Enable Companion App", isOn: $settings.enableCompanionApp)
+                .toggleStyle(CheckboxToggleStyle())
+                .padding(.horizontal, 12)
+                .padding(.bottom, 1)
+                .onChange(of: settings.enableCompanionApp) { _, _ in
+                    if settings.enableCompanionApp {
+                        NotificationCenter.default.post(name: .startCompanionServer, object: nil)
+                    } else {
+                        NotificationCenter.default.post(name: .stopCompanionServer, object: nil)
+                    }
+                }
             
             Toggle("Show Album Art", isOn: $settings.showAlbumArt)
                 .toggleStyle(CheckboxToggleStyle())

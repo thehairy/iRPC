@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		F49296B22DC9520600FA24D8 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = F49296B12DC9520600FA24D8 /* README.md */; };
+		F4B3030F2DCA7438006ECDE2 /* FlyingFox in Frameworks */ = {isa = PBXBuildFile; productRef = F4B3030E2DCA7438006ECDE2 /* FlyingFox */; };
+		F4B303112DCA7438006ECDE2 /* FlyingSocks in Frameworks */ = {isa = PBXBuildFile; productRef = F4B303102DCA7438006ECDE2 /* FlyingSocks */; };
 		F4BE1C502DC94B49009B622C /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = F4BE1C4F2DC94B49009B622C /* LaunchAtLogin */; };
 /* End PBXBuildFile section */
 
@@ -30,6 +32,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				F4BE1C502DC94B49009B622C /* LaunchAtLogin in Frameworks */,
+				F4B303112DCA7438006ECDE2 /* FlyingSocks in Frameworks */,
+				F4B3030F2DCA7438006ECDE2 /* FlyingFox in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -74,6 +78,8 @@
 			name = iRPC;
 			packageProductDependencies = (
 				F4BE1C4F2DC94B49009B622C /* LaunchAtLogin */,
+				F4B3030E2DCA7438006ECDE2 /* FlyingFox */,
+				F4B303102DCA7438006ECDE2 /* FlyingSocks */,
 			);
 			productName = iRPC;
 			productReference = F4BE1C312DC94AD5009B622C /* iRPC.app */;
@@ -105,6 +111,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				F4BE1C4E2DC94B49009B622C /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
+				F4B3030D2DCA7438006ECDE2 /* XCRemoteSwiftPackageReference "FlyingFox" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F4BE1C322DC94AD5009B622C /* Products */;
@@ -340,6 +347,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		F4B3030D2DCA7438006ECDE2 /* XCRemoteSwiftPackageReference "FlyingFox" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swhitty/FlyingFox";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.22.0;
+			};
+		};
 		F4BE1C4E2DC94B49009B622C /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sindresorhus/LaunchAtLogin-Modern";
@@ -351,6 +366,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		F4B3030E2DCA7438006ECDE2 /* FlyingFox */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F4B3030D2DCA7438006ECDE2 /* XCRemoteSwiftPackageReference "FlyingFox" */;
+			productName = FlyingFox;
+		};
+		F4B303102DCA7438006ECDE2 /* FlyingSocks */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F4B3030D2DCA7438006ECDE2 /* XCRemoteSwiftPackageReference "FlyingFox" */;
+			productName = FlyingSocks;
+		};
 		F4BE1C4F2DC94B49009B622C /* LaunchAtLogin */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = F4BE1C4E2DC94B49009B622C /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */;

@@ -24,6 +24,8 @@ class SettingsManager: ObservableObject {
     @Published var showAlbumArt: Bool
     /// Determines if action buttons (e.g., "Listen on Music") should be shown in the Discord Rich Presence.
     @Published var showButtons: Bool
+    /// Determines if the iOS companion app should be started
+    @Published var enableCompanionApp: Bool
 
     // MARK: - Private Properties
 
@@ -32,6 +34,7 @@ class SettingsManager: ObservableObject {
         case launchAtLogin
         case showAlbumArt
         case showButtons
+        case enableCompanionApp
     }
 
     /// The interface to the iCloud Key-Value Store.
@@ -49,6 +52,7 @@ class SettingsManager: ObservableObject {
         launchAtLogin = kvStore.bool(forKey: Keys.launchAtLogin.rawValue) // Default false from extension
         showAlbumArt = kvStore.bool(forKey: Keys.showAlbumArt.rawValue, withDefaultValue: true)
         showButtons = kvStore.bool(forKey: Keys.showButtons.rawValue, withDefaultValue: true)
+        enableCompanionApp = kvStore.bool(forKey: Keys.enableCompanionApp.rawValue, withDefaultValue: true)
 
         // Observe notifications for changes made to the KVS from other devices or instances.
         NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification, object: kvStore)
@@ -63,7 +67,7 @@ class SettingsManager: ObservableObject {
         // Set up Combine publishers to automatically save local changes to KVS.
         setupPublishers()
 
-        print("[SettingsManager] Initialized with settings: LaunchAtLogin=\(launchAtLogin), ShowArt=\(showAlbumArt), ShowButtons=\(showButtons)")
+        print("[SettingsManager] Initialized with settings: LaunchAtLogin=\(launchAtLogin), ShowArt=\(showAlbumArt), ShowButtons=\(showButtons), EnableCompanionApp=\(enableCompanionApp)")
     }
 
     // MARK: - Combine Setup & iCloud Syncing
@@ -98,6 +102,16 @@ class SettingsManager: ObservableObject {
             .sink { [weak self] newValue in
                 print("[SettingsManager] Saving showButtons=\(newValue) to iCloud KVS.")
                 self?.kvStore.set(newValue, forKey: Keys.showButtons.rawValue)
+                self?.kvStore.synchronize()
+            }
+            .store(in: &subscriptions)
+        
+        $enableCompanionApp
+            .dropFirst()
+            .debounce(for: .milliseconds(200), scheduler: RunLoop.main)
+            .sink { [weak self] newValue in
+                print("[SettingsManager] Saving enableCompanionApp=\(newValue) to iCloud KVS.")
+                self?.kvStore.set(newValue, forKey: Keys.enableCompanionApp.rawValue)
                 self?.kvStore.synchronize()
             }
             .store(in: &subscriptions)
@@ -156,6 +170,12 @@ class SettingsManager: ObservableObject {
                     if self.showButtons != newValue {
                         self.showButtons = newValue
                         print("[SettingsManager] Updated showButtons from iCloud: \(newValue)")
+                    }
+                case Keys.enableCompanionApp.rawValue:
+                    let newValue = self.kvStore.bool(forKey: key, withDefaultValue: true)
+                    if self.enableCompanionApp != newValue {
+                        self.enableCompanionApp = newValue
+                        print("[SettingsManager] Updated enableCoimpanionApp from iCloud: \(newValue)")
                     }
                 default:
                     // Ignore keys not managed by this class.

@@ -68,9 +68,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             name: .refreshDiscordPresence,
             object: nil
         )
+        
+        // Observe notifications to force a presence update (e.g., when settings change)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(tryStartCompanionServer),
+            name: .startCompanionServer,
+            object: nil
+        )
 
         // Start the connection process
         tryConnectToDiscord()
+        tryStartCompanionServer()
     }
 
     // MARK: - Popover Management
@@ -200,62 +209,109 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// or if playback has stopped. Only sends updates if song details or playback position
     /// (within a tolerance) have changed.
     private func updateCurrentPresenceIfNeeded() {
-        guard let currentSong = MusicController.getCurrentSong() else {
-            // No song is playing or music app isn't running/accessible.
-            if lastPresence != nil {
-                // If presence was previously set, clear it now.
-                log("Music stopped or unavailable. Clearing presence.")
-                DiscordRPC.shared.clearPresence()
-                lastPresence = nil
-            }
-            return // Nothing to update if no song is playing.
-        }
+        // First try to get music from local Apple Music
+        if let currentSong = MusicController.getCurrentSong() {
+            // Use local music data (existing code for local music)
+            let settings = SettingsManager.shared
+            let now = Date().timeIntervalSince1970
+            let calculatedStartTimestamp = Int(now - currentSong.position)
 
-        // Song is playing, prepare current presence data.
-        let settings = SettingsManager.shared
-        let now = Date().timeIntervalSince1970
-        let calculatedStartTimestamp = Int(now - currentSong.position)
-
-        let currentPresenceData = PresenceData(
-            title: currentSong.title,
-            artist: currentSong.artist,
-            album: currentSong.album,
-            startTimestamp: calculatedStartTimestamp
-        )
-
-        // Determine if an update is needed.
-        var shouldUpdate = false
-        if let last = lastPresence {
-            // Check if song details changed.
-            if last.title != currentPresenceData.title ||
-               last.artist != currentPresenceData.artist ||
-               last.album != currentPresenceData.album {
-                log("Song changed: \(currentPresenceData.artist) - \(currentPresenceData.title)")
-                shouldUpdate = true
-            } else {
-                // Check if playback position jumped significantly (e.g., user scrubbed).
-                let timeDifference = abs(last.startTimestamp - currentPresenceData.startTimestamp)
-                if timeDifference > 3 { // Tolerance in seconds
-                    log("Playback position changed significantly (diff: \(timeDifference)s). Updating timestamp.")
-                    shouldUpdate = true
-                }
-            }
-        } else {
-            // No previous presence, so update if a song is now playing.
-            log("New song playing: \(currentPresenceData.artist) - \(currentPresenceData.title)")
-            shouldUpdate = true
-        }
-
-        // Send the update if needed.
-        if shouldUpdate {
-            log("Updating Discord presence.")
-            DiscordRPC.shared.updatePresence(
-                with: currentSong,
-                showAlbumArt: settings.showAlbumArt,
-                showButtons: settings.showButtons
+            let currentPresenceData = PresenceData(
+                title: currentSong.title,
+                artist: currentSong.artist,
+                album: currentSong.album,
+                startTimestamp: calculatedStartTimestamp
             )
-            // Store the newly sent presence data for future comparisons.
-            lastPresence = currentPresenceData
+
+            // Determine if an update is needed.
+            var shouldUpdate = false
+            if let last = lastPresence {
+                // Check if song details changed.
+                if last.title != currentPresenceData.title ||
+                   last.artist != currentPresenceData.artist ||
+                   last.album != currentPresenceData.album {
+                    log("Song changed: \(currentPresenceData.artist) - \(currentPresenceData.title)")
+                    shouldUpdate = true
+                } else {
+                    // Check if playback position jumped significantly (e.g., user scrubbed).
+                    let timeDifference = abs(last.startTimestamp - currentPresenceData.startTimestamp)
+                    if timeDifference > 3 { // Tolerance in seconds
+                        log("Playback position changed significantly (diff: \(timeDifference)s). Updating timestamp.")
+                        shouldUpdate = true
+                    }
+                }
+            } else {
+                // No previous presence, so update if a song is now playing.
+                log("New song playing: \(currentPresenceData.artist) - \(currentPresenceData.title)")
+                shouldUpdate = true
+            }
+
+            // Send the update if needed.
+            if shouldUpdate {
+                log("Updating Discord presence.")
+                DiscordRPC.shared.updatePresence(
+                    with: currentSong,
+                    showAlbumArt: settings.showAlbumArt,
+                    showButtons: settings.showButtons
+                )
+                // Store the newly sent presence data for future comparisons.
+                lastPresence = currentPresenceData
+            }
+        }
+        // No local music playing, check companion data from iOS app
+        else if Companion.shared.hasActiveMusicData, let companionMusic = Companion.shared.latestMusicData {
+            // Convert companion data to MusicInfo format
+            let musicInfo = Companion.shared.toMusicInfo(from: companionMusic)
+            let settings = SettingsManager.shared
+            
+            // Use similar logic to local music playback for tracking changes
+            let now = Date().timeIntervalSince1970
+            let calculatedStartTimestamp = Int(now - musicInfo.position)
+            
+            let currentPresenceData = PresenceData(
+                title: musicInfo.title,
+                artist: musicInfo.artist,
+                album: musicInfo.album,
+                startTimestamp: calculatedStartTimestamp
+            )
+            
+            // Determine if an update is needed
+            var shouldUpdate = false
+            if let last = lastPresence {
+                if last.title != currentPresenceData.title || 
+                   last.artist != currentPresenceData.artist || 
+                   last.album != currentPresenceData.album {
+                    log("iOS companion song changed: \(currentPresenceData.artist) - \(currentPresenceData.title)")
+                    shouldUpdate = true
+                } else {
+                    // Check for position jumps
+                    let timeDifference = abs(last.startTimestamp - currentPresenceData.startTimestamp)
+                    if timeDifference > 3 {
+                        log("iOS companion playback position changed significantly. Updating timestamp.")
+                        shouldUpdate = true
+                    }
+                }
+            } else {
+                log("New iOS companion song playing: \(currentPresenceData.artist) - \(currentPresenceData.title)")
+                shouldUpdate = true
+            }
+            
+            // Send the update if needed
+            if shouldUpdate {
+                log("Updating Discord presence with iOS companion music.")
+                DiscordRPC.shared.updatePresence(
+                    with: musicInfo,
+                    showAlbumArt: settings.showAlbumArt,
+                    showButtons: settings.showButtons
+                )
+                lastPresence = currentPresenceData
+            }
+        }
+        // No music from anywhere, clear presence if needed
+        else if lastPresence != nil {
+            log("No music playing locally or from iOS companion. Clearing presence.")
+            DiscordRPC.shared.clearPresence()
+            lastPresence = nil
         }
     }
 
@@ -272,6 +328,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
              updateCurrentPresenceIfNeeded()
         } else {
              log("Cannot force update: Discord not connected.", level: .warning)
+        }
+    }
+    
+    // MARK: - Companion Server
+    
+    @objc private func tryStartCompanionServer() {
+        let settings = SettingsManager.shared
+        if settings.enableCompanionApp {
+            Task.detached {
+                do {
+                    try await Companion.shared.startServer()
+                } catch {
+                    if !error.localizedDescription.contains("Bad file descriptor") {
+                        self.log("Failed to start companion server: \(error)", level: .error)
+                    }
+                }
+            }
+        } else {
+            // Stop server if setting disabled
+            self.log("Companion app disabled, stopping server")
+            
+            // Post notification on main thread to avoid potential threading issues
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .stopCompanionServer, object: nil)
+            }
         }
     }
 
