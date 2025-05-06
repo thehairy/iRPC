@@ -318,12 +318,10 @@ public class DiscordRPC {
 
         switch op {
         case 1: // Frame (Dispatch)
+            
             guard let message = jsonPayload as? [String: Any],
-                  let command = message["cmd"] as? String, command == "DISPATCH",
-                  let eventType = message["evt"] as? String else {
-                self.log("Received malformed Frame (Op 1) message.", level: .warning)
-                return
-            }
+                  let command = message["cmd"] as? String, command == "DISPATCH" || command == "SET_ACTIVITY",
+                  let eventType = message["evt"] as? String else { return }
 
             self.log("Received Dispatch Event: \(eventType)")
             if eventType == "READY" {
@@ -331,12 +329,11 @@ public class DiscordRPC {
                 isConnected = true
                 isFailedReason = nil // Clear failure state
                 self.log("Discord RPC connection READY.")
-                // Start heartbeats *after* READY is confirmed.
                 startHeartbeat()
             }
-
-        case 3: // Heartbeat ACK (Pong)
-            self.log("Received Heartbeat ACK (Op 3 - Pong). Connection alive.")
+            
+        case 4: // Heartbeat ACK (Pong)
+            self.log("Received Heartbeat ACK (Op 4 - Pong). Connection alive.")
 
         case 5: // Close
             self.log("Received Close (Op 5) from Discord: \(jsonPayload ?? "No details").", level: .warning)
