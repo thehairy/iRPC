@@ -1,0 +1,94 @@
+//
+//  NowPlayingKit.swift
+//  NowPlayingKit
+//
+//  Created by Adrian Castro on 8/5/25.
+//
+
+import Foundation
+import MusicKit
+
+public enum NowPlayingError: Error {
+    case noCurrentEntry
+    case unauthorized
+}
+
+public struct NowPlayingData: Sendable {
+    public let title: String
+    public let artist: String
+    public let album: String?
+    public let artworkURL: URL?
+    public let playbackTime: TimeInterval
+    public let duration: TimeInterval
+    
+    public init(
+        title: String,
+        artist: String,
+        album: String? = nil,
+        artworkURL: URL? = nil,
+        playbackTime: TimeInterval = 0,
+        duration: TimeInterval = 1
+    ) {
+        self.title = title
+        self.artist = artist
+        self.album = album
+        self.artworkURL = artworkURL
+        self.playbackTime = playbackTime
+        self.duration = duration
+    }
+}
+
+public final class NowPlayingManager {
+    public static let shared = NowPlayingManager()
+    private let player = SystemMusicPlayer.shared
+    
+    private init() {}
+    
+    public func authorize() async -> MusicAuthorization.Status {
+        return await MusicAuthorization.request()
+    }
+    
+    public func getCurrentPlayback() async throws -> NowPlayingData {
+        let authStatus = MusicAuthorization.currentStatus
+        guard authStatus == .authorized else {
+            throw NowPlayingError.unauthorized
+        }
+        
+        guard let entry = player.queue.currentEntry else {
+            throw NowPlayingError.noCurrentEntry
+        }
+        
+        let title = entry.title
+        let artworkURL = entry.artwork?.url(width: 300, height: 300)
+        var artist = ""
+        var album: String? = nil
+        var duration: TimeInterval = 1
+        
+        if let item = entry.item {
+            switch item {
+            case .song(let song):
+                duration = song.duration ?? 1
+                artist = song.artistName
+                album = song.albumTitle
+            case .musicVideo(let musicVideo):
+                duration = musicVideo.duration ?? 1
+                artist = musicVideo.artistName
+            @unknown default:
+                duration = 1
+            }
+        }
+        
+        return NowPlayingData(
+            title: title,
+            artist: artist,
+            album: album,
+            artworkURL: artworkURL,
+            playbackTime: player.playbackTime,
+            duration: duration
+        )
+    }
+    
+    public var queue: MusicPlayer.Queue {
+        player.queue
+    }
+}
