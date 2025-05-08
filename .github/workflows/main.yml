@@ -48,8 +48,8 @@ jobs:
       - name: Get Next Version
         id: get_next_version
         run: |
-          VERSION=$(get-next-version --target github-action)
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          get-next-version --target github-action > version.txt
+          echo "version=$(cat version.txt)" >> $GITHUB_OUTPUT
 
       - name: Bump version in Config.xcconfig
         run: |
