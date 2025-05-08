@@ -1,0 +1,12 @@
+//
+//  Config.xcconfig
+//  iRPC
+//
+//  Created by Adrian Castro on 7/5/25.
+//
+
+// Configuration settings file format documentation can be found at:
+// https://developer.apple.com/documentation/xcode/adding-a-build-configuration-file-to-your-project
+
+BUILD_NUMBER = 1
+VERSION = 1.0.0
