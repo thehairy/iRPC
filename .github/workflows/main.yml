@@ -4,7 +4,6 @@ on:
   push:
      branches:
        - main
-       - test
      paths-ignore:
        - '**/*.md'
        - '**.github/workflows/*'
@@ -40,18 +39,17 @@ jobs:
       #     p12-file-base64: ${{ secrets.P12_CERTIFICATE_BASE64 }}
       #     p12-password: ${{ secrets.P12_PASSWORD }}
 
+      - name: Setup get-next-version
+        run: |
+          curl -L -o get-next-version https://github.com/thenativeweb/get-next-version/releases/download/2.6.3/get-next-version-darwin-arm64
+          chmod a+x get-next-version
+          sudo mv get-next-version /usr/local/bin
+
       - name: Get Next Version
-        id: semver
-        uses: ietf-tools/semver-action@v1
-        with:
-          skipInvalidTags: true
-          noVersionBumpBehavior: "error"
-          majorList: "major, breaking"
-          patchAll: true
-          fallbackTag: "v1.0.0"
-          token: ${{ env.GITHUB_TOKEN }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: get_next_version
+        run: |
+          VERSION=$(get-next-version --target github-action)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Bump version in Config.xcconfig
         run: |
@@ -60,14 +58,14 @@ jobs:
           sed -i '' "s/BUILD_NUMBER = $CURRENT_BUILD/BUILD_NUMBER = $NEW_BUILD/" iRPC/Config.xcconfig
           
           CURRENT_VERSION=$(grep VERSION iRPC/Config.xcconfig | cut -d ' ' -f 3)
-          NEW_VERSION=${{ steps.semver.outputs.nextStrict }}
+          NEW_VERSION=${{ steps.get_next_version.outputs.version }}
           sed -i '' "s/VERSION = $CURRENT_VERSION/VERSION = $NEW_VERSION/" iRPC/Config.xcconfig
 
       - name: Build Changelog
         uses: dlavrenuek/conventional-changelog-action@v1.2.3
         id: changelog
         with:
-          from: ${{ steps.semver.outputs.current }}
+          from: ${{ steps.get_next_version.outputs.version }}
           to: HEAD
           
       - name: Build macOS app
@@ -139,7 +137,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.semver.outputs.next }}
+          tag_name: ${{ steps.get_next_version.outputs.version }}
           body_path: RELEASE.md
           files: ./*.dmg
           fail_on_unmatched_files: true
