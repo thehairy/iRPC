@@ -127,11 +127,11 @@
 		3A4B2FCA2DCD4C16006DFDDA /* Exceptions for "DiscordSocialKit" folder in "Embed Frameworks" phase from "DiscordSocialKit" target */ = {
 			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
 			attributesByRelativePath = {
-				discord_social_sdk/lib/release/discord_partner_sdk.xcframework = (CodeSignOnCopy, RemoveHeadersOnCopy, );
+				discord_partner_sdk.xcframework = (CodeSignOnCopy, RemoveHeadersOnCopy, );
 			};
 			buildPhase = 3A4B2FC92DCD4C16006DFDDA /* Embed Frameworks */;
 			membershipExceptions = (
-				discord_social_sdk/lib/release/discord_partner_sdk.xcframework,
+				discord_partner_sdk.xcframework,
 			);
 		};
 /* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
