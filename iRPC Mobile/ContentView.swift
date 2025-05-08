@@ -14,23 +14,24 @@ import SwiftUI
 struct ContentView: View {
 	@State private var nowPlaying = NowPlayingData(title: "Loading...", artist: "")
 	@State private var isAuthorized = false
-	@StateObject private var discord = DiscordManager(applicationId: 1370062110272520313)
+	@StateObject private var discord = DiscordManager(applicationId: 1_370_062_110_272_520_313)
 	private let manager = NowPlayingManager.shared
 	private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
 	var body: some View {
-		Group {
-			if !discord.isReady {
-				ProgressView("Connecting to Discord...")
-			} else if !discord.isAuthenticated {
+		VStack(spacing: 20) {
+			if !isAuthorized {
 				VStack {
-					Text("Discord Login Required")
+					Text("Music Access Required")
 						.font(.headline)
-					Button("Login with Discord") {
-						discord.authorize()
+					Button("Authorize Access") {
+						Task {
+							await requestAuthorization()
+						}
 					}
+					.buttonStyle(.borderedProminent)
 				}
-			} else if isAuthorized {
+			} else {
 				VStack(spacing: 20) {
 					Text("Now Playing:")
 						.font(.headline)
@@ -67,7 +68,9 @@ struct ContentView: View {
 									.shadow(radius: 10)
 							default:
 								ProgressView()
-									.progressViewStyle(CircularProgressViewStyle(tint: .primary))
+									.progressViewStyle(
+										CircularProgressViewStyle(tint: .primary)
+									)
 									.frame(width: 50, height: 50)
 							}
 						}
@@ -94,16 +97,51 @@ struct ContentView: View {
 						}
 						.padding(.horizontal)
 					}
-				}
-			} else {
-				VStack {
-					Text("Music Access Required")
-						.font(.headline)
-					Button("Authorize Access") {
-						Task {
-							await requestAuthorization()
+
+					VStack {
+						Text("Discord Status")
+							.font(.headline)
+
+						ZStack {
+							// Auth Button Layer
+							Button(action: {
+								discord.authorize()
+							}) {
+								Label("Link Discord Account", systemImage: "person.badge.key.fill")
+									.font(.headline)
+									.foregroundColor(.white)
+									.padding()
+									.background(Color.blue)
+									.cornerRadius(10)
+							}
+							.opacity(
+								!discord.isAuthorizing && !discord.isAuthenticated
+									&& discord.errorMessage == nil ? 1 : 0)
+
+							// Loading Layer
+							ProgressView("Authorizing...")
+								.opacity(discord.isAuthorizing ? 1 : 0)
+
+							// Success Layer
+							Label("Connected to Discord", systemImage: "checkmark.circle.fill")
+								.foregroundColor(.green)
+								.opacity(discord.isAuthenticated ? 1 : 0)
+
+							// Error Layer
+							if let error = discord.errorMessage {
+								Text(error)
+									.foregroundColor(.red)
+									.multilineTextAlignment(.center)
+							}
 						}
+						.frame(height: 44)  // Add fixed height to prevent layout shifts
+						.animation(.easeInOut, value: discord.isAuthorizing)
+						.animation(.easeInOut, value: discord.isAuthenticated)
+						.animation(.easeInOut, value: discord.errorMessage)
 					}
+					.padding()
+					.background(Color.secondary.opacity(0.1))
+					.cornerRadius(15)
 				}
 			}
 		}
