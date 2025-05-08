@@ -48,8 +48,11 @@ jobs:
       - name: Get Next Version
         id: get_next_version
         run: |
-          get-next-version --target github-action > version.txt
-          echo "version=$(cat version.txt)" >> $GITHUB_OUTPUT
+          OUTPUT=$(get-next-version --target json)
+          NEXT_VERSION=$(echo $OUTPUT | jq -r '.version')
+          CURRENT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
       - name: Bump version in Config.xcconfig
         run: |
@@ -65,8 +68,11 @@ jobs:
         uses: dlavrenuek/conventional-changelog-action@v1.2.3
         id: changelog
         with:
-          from: ${{ steps.get_next_version.outputs.version }}
+          from: ${{ steps.get_next_version.outputs.current_version }}
           to: HEAD
+
+      - name: Write Changelog
+        run: echo "${{ steps.changelog.outputs.body }}" > RELEASE.md
           
       - name: Build macOS app
         run: xcodebuild archive -scheme "iRPC" -configuration "Release" -archivePath "build/iRPC.xcarchive" -destination "generic/platform=macOS,name=Any Mac" CODE_SIGN_IDENTITY="" CODE_SIGNING_ALLOWED=NO "OTHER_SWIFT_FLAGS=${inherited} -D GITHUB_RELEASE" | xcbeautify
