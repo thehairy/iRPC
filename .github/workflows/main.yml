@@ -4,6 +4,7 @@ on:
   push:
      branches:
        - main
+       - test
      paths-ignore:
        - '**/*.md'
        - '**.github/workflows/*'
@@ -40,16 +41,8 @@ jobs:
       #     p12-password: ${{ secrets.P12_PASSWORD }}
 
       - name: Get Next Version
-        id: semver
-        uses: ietf-tools/semver-action@v1
-        with:
-          skipInvalidTags: true
-          noVersionBumpBehavior: "error"
-          majorList: "major, breaking"
-          patchAll: true
-          token: ${{ env.GITHUB_TOKEN }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: get_next_version
+        uses: thenativeweb/get-next-version@main
 
       - name: Bump version in Config.xcconfig
         run: |
@@ -58,7 +51,7 @@ jobs:
           sed -i '' "s/BUILD_NUMBER = $CURRENT_BUILD/BUILD_NUMBER = $NEW_BUILD/" iRPC/Config.xcconfig
           
           CURRENT_VERSION=$(grep VERSION iRPC/Config.xcconfig | cut -d ' ' -f 3)
-          NEW_VERSION=${{ steps.semver.outputs.nextStrict }}
+          NEW_VERSION=${{ steps.get_next_version.outputs.version }}
           sed -i '' "s/VERSION = $CURRENT_VERSION/VERSION = $NEW_VERSION/" iRPC/Config.xcconfig
 
       - name: Build Changelog
