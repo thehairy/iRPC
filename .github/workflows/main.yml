@@ -65,7 +65,7 @@ jobs:
           sed -i '' "s/VERSION = $CURRENT_VERSION/VERSION = $NEW_VERSION/" iRPC/Config.xcconfig
 
       - name: Build Changelog
-        uses: dlavrenuek/conventional-changelog-action@v1.2.3
+        uses: dlavrenuek/conventional-changelog-action@v1.2.5
         id: changelog
         with:
           from: ${{ steps.get_next_version.outputs.current_version }}
