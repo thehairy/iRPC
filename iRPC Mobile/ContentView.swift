@@ -16,6 +16,8 @@ struct ContentView: View {
 	@State private var isAuthorized = false
 	@StateObject private var discord = DiscordManager(applicationId: 1_370_062_110_272_520_313)
 	private let manager = NowPlayingManager.shared
+	@State private var lastUpdateTime: TimeInterval = 0
+	private let updateInterval: TimeInterval = 1
 	private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
 	var body: some View {
@@ -173,15 +175,38 @@ struct ContentView: View {
 
 	private func updateNowPlaying() async {
 		do {
-			nowPlaying = try await manager.getCurrentPlayback()
+			let newPlayback = try await manager.getCurrentPlayback()
+			nowPlaying = newPlayback
+
+			if discord.isAuthenticated && discord.isReady {
+				discord.updateCurrentPlayback(
+					title: newPlayback.title,
+					artist: newPlayback.artist,
+					duration: newPlayback.duration,
+					currentTime: newPlayback.playbackTime,
+					artworkURL: newPlayback.artworkURL
+				)
+			}
 		} catch {
 			nowPlaying = NowPlayingData(title: "No song playing", artist: "")
+			discord.clearPlayback()
 		}
 	}
 
 	private func updatePlaybackTime() async {
 		do {
-			nowPlaying = try await manager.getCurrentPlayback()
+			let current = try await manager.getCurrentPlayback()
+			nowPlaying = current
+
+			if discord.isAuthenticated {
+				discord.updateCurrentPlayback(
+					title: current.title,
+					artist: current.artist,
+					duration: current.duration,
+					currentTime: current.playbackTime,
+					artworkURL: current.artworkURL
+				)
+			}
 		} catch {
 			// Ignore errors during playback time updates
 		}
