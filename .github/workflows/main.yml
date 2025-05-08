@@ -117,14 +117,12 @@ jobs:
       #     name: appcast
       #     path: ./update/appcast.xml
 
-      - name: Create DMG file
+      - name: Create App Archive
         run: |
-          cp -R "build/iRPC.xcarchive/Products/Applications/"*.app "build/iRPC.app"
-          cd build
-          npm install --global create-dmg
-          create-dmg "iRPC.app" --overwrite
-          mv *.dmg iRPC.dmg
-          
+          cp -R "build/iRPC.xcarchive/Products/Applications/"*.app "iRPC.app"
+          zip -r iRPC.zip iRPC.app
+          rm -rf iRPC.app
+
       - name: Commit & Push changes
         uses: EndBug/add-and-commit@v9
         with:
@@ -139,7 +137,7 @@ jobs:
         with:
           tag_name: ${{ steps.get_next_version.outputs.version }}
           body_path: RELEASE.md
-          files: ./*.dmg
+          files: iRPC.zip
           fail_on_unmatched_files: true
           token: ${{ env.GITHUB_TOKEN }}
         env:
