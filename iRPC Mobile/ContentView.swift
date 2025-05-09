@@ -161,9 +161,11 @@ struct ContentView: View {
 							Button(action: {
 								if discord.isRunning {
 									discord.stopPresenceUpdates()
+									BackgroundController.shared.stop()
 									userEnabledRPC = false
 								} else {
 									discord.startPresenceUpdates()
+									BackgroundController.shared.start()
 									userEnabledRPC = true
 								}
 							}) {
@@ -202,8 +204,8 @@ struct ContentView: View {
 
 			isLoading = false
 		}
-		.onChange(of: discord.isAuthenticated) { authenticated in
-			if authenticated {
+		.onChange(of: discord.isAuthenticated) { oldValue, newValue in
+			if newValue {
 				isAuthenticating = false
 			}
 		}
@@ -294,7 +296,7 @@ struct ContentView: View {
 
 		do {
 			if let token = try modelContext.fetch(descriptor).first {
-				print("🔍 Found existing token with ID: \(token.tokenId ?? "unknown")")
+				print("🔍 Found existing token with ID: \(token.tokenId)")
 				return true
 			}
 			print("ℹ️ No existing token found")

@@ -18,7 +18,7 @@ public final class DiscordToken {
 	}
 
 	public var isValid: Bool {
-		guard let accessToken = accessToken else { return false }
+        guard accessToken != nil else { return false }
 		guard let expiresAt = expiresAt else { return false }
 		let timeUntilExpiry = expiresAt.timeIntervalSinceNow
 		let isValid = timeUntilExpiry > 0
