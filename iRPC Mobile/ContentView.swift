@@ -17,7 +17,8 @@ struct ContentView: View {
 	@State private var nowPlaying = NowPlayingData(title: "Loading...", artist: "")
 	@State private var isAuthorized = false
 	@State private var isLoading = true
-	@State private var isAuthenticating = false  // Add new state
+	@State private var isAuthenticating = false
+	@State private var userEnabledRPC = false
 	@StateObject private var discord = DiscordManager(applicationId: 1_370_062_110_272_520_313)
 	private let manager = NowPlayingManager.shared
 	@State private var lastUpdateTime: TimeInterval = 0
@@ -160,8 +161,10 @@ struct ContentView: View {
 							Button(action: {
 								if discord.isRunning {
 									discord.stopPresenceUpdates()
+									userEnabledRPC = false
 								} else {
 									discord.startPresenceUpdates()
+									userEnabledRPC = true
 								}
 							}) {
 								Text(discord.isRunning ? "Stop RPC" : "Start RPC")
@@ -214,6 +217,17 @@ struct ContentView: View {
 			guard isAuthorized else { return }
 			Task {
 				await updateNowPlaying()
+			}
+		}
+		.onReceive(manager.$isPlaying) { isPlaying in
+			guard userEnabledRPC, discord.isAuthenticated else { return }
+
+			if isPlaying && !discord.isRunning {
+				print("▶️ Music started playing, starting RPC")
+				discord.startPresenceUpdates()
+			} else if !isPlaying && discord.isRunning {
+				print("⏸️ Music paused, stopping RPC")
+				discord.stopPresenceUpdates()
 			}
 		}
 	}
