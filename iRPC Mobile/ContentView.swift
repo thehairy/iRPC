@@ -10,11 +10,14 @@
 import Combine
 import DiscordSocialKit
 import NowPlayingKit
+import SwiftData
 import SwiftUI
 
 struct ContentView: View {
 	@State private var nowPlaying = NowPlayingData(title: "Loading...", artist: "")
 	@State private var isAuthorized = false
+	@State private var isLoading = true
+	@State private var isAuthenticating = false  // Add new state
 	@StateObject private var discord = DiscordManager(applicationId: 1_370_062_110_272_520_313)
 	private let manager = NowPlayingManager.shared
 	@State private var lastUpdateTime: TimeInterval = 0
@@ -106,8 +109,13 @@ struct ContentView: View {
 							.font(.headline)
 
 						ZStack {
+							// Loading Layer
+							ProgressView("Connecting...")
+								.opacity(isLoading || isAuthenticating ? 1 : 0)
+
 							// Auth Button Layer
 							Button(action: {
+								isAuthenticating = true  // Set authenticating state
 								discord.authorize()
 							}) {
 								Label("Link Discord Account", systemImage: "person.badge.key.fill")
@@ -119,11 +127,7 @@ struct ContentView: View {
 							}
 							.opacity(
 								!discord.isAuthorizing && !discord.isAuthenticated
-									&& discord.errorMessage == nil ? 1 : 0)
-
-							// Loading Layer
-							ProgressView("Authorizing...")
-								.opacity(discord.isAuthorizing ? 1 : 0)
+									&& !isLoading && !isAuthenticating ? 1 : 0)
 
 							// Success Layer
 							Label("Connected to Discord", systemImage: "checkmark.circle.fill")
@@ -173,14 +177,31 @@ struct ContentView: View {
 		}
 		.padding()
 		.task {
+			print("🔄 Initializing Discord connection...")
+			// Ensure model context is set first
 			await MainActor.run {
+				print("📱 Setting ModelContext...")
 				discord.setModelContext(modelContext)
+			}
+
+			// Check for existing token and try to restore session
+			let hasExistingToken = await checkExistingToken()
+			if hasExistingToken {
+				isAuthenticating = true
+				await discord.setupWithExistingToken()
 			}
 
 			await requestAuthorization()
 			if isAuthorized {
+				print("🎵 Music access authorized, setting up Discord...")
 				await updateNowPlaying()
-				await discord.setupWithExistingToken()
+			}
+
+			isLoading = false
+		}
+		.onChange(of: discord.isAuthenticated) { authenticated in
+			if authenticated {
+				isAuthenticating = false
 			}
 		}
 		.onReceive(timer) { _ in
@@ -249,6 +270,25 @@ struct ContentView: View {
 
 	private func setup() {
 		discord.setModelContext(modelContext)
+	}
+
+	private func checkExistingToken() async -> Bool {
+		var descriptor = FetchDescriptor<DiscordToken>(
+			sortBy: [SortDescriptor(\DiscordToken.expiresAt, order: .reverse)]
+		)
+		descriptor.fetchLimit = 1
+
+		do {
+			if let token = try modelContext.fetch(descriptor).first {
+				print("🔍 Found existing token with ID: \(token.tokenId ?? "unknown")")
+				return true
+			}
+			print("ℹ️ No existing token found")
+			return false
+		} catch {
+			print("❌ Failed to check for existing token: \(error)")
+			return false
+		}
 	}
 
 	private var timer: Publishers.Autoconnect<Timer.TimerPublisher> {

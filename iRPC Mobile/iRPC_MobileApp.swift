@@ -16,9 +16,19 @@ struct iRPC_MobileApp: App {
 	init() {
 		do {
 			let schema = Schema([DiscordToken.self])
-			let modelConfiguration = ModelConfiguration(schema: schema)
-			container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+			let config = ModelConfiguration(
+				schema: schema,
+				isStoredInMemoryOnly: false,
+				allowsSave: true
+			)
+
+			container = try ModelContainer(
+				for: schema,
+				configurations: config
+			)
+			print("✅ ModelContainer initialized for CloudKit sync")
 		} catch {
+			print("❌ Failed to initialize ModelContainer: \(error)")
 			fatalError("Failed to initialize ModelContainer: \(error)")
 		}
 	}

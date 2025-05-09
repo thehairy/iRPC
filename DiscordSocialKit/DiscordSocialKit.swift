@@ -347,34 +347,60 @@ public final class DiscordManager: ObservableObject {
 		accessToken: String, refreshToken: String, expiresIn: TimeInterval
 	) async {
 		await MainActor.run {
-			print("🔄 Updating stored token...")
-			// Delete old tokens first
-			if let context = modelContext {
-				let descriptor = FetchDescriptor<DiscordToken>()
-				do {
-					let existingTokens = try context.fetch(descriptor)
-					print("Found \(existingTokens.count) existing tokens to remove")
-					for token in existingTokens {
-						context.delete(token)
-					}
-
-					// Create and save new token
-					let token = DiscordToken(
-						accessToken: accessToken,
-						refreshToken: refreshToken,
-						expiresIn: expiresIn
-					)
-					context.insert(token)
-					try context.save()
-					print("✅ New token saved successfully")
-					print("- Access Token: \(accessToken.prefix(10))...")
-					print("- Expires In: \(expiresIn) seconds")
-				} catch {
-					print("❌ Error managing tokens: \(error)")
-				}
-			} else {
-				print("❌ Cannot update token: No ModelContext available")
+			guard let context = modelContext else {
+				print("❌ No ModelContext available")
+				return
 			}
+
+			do {
+				print("💾 Saving new token...")
+
+				// Clear existing tokens
+				let descriptor = FetchDescriptor<DiscordToken>()
+				let existingTokens = try context.fetch(descriptor)
+				for token in existingTokens {
+					print("🗑️ Removing old token: \(token.tokenId)")
+					context.delete(token)
+				}
+
+				// Create new token
+				let token = DiscordToken(
+					accessToken: accessToken,
+					refreshToken: refreshToken,
+					expiresIn: expiresIn
+				)
+
+				// Save new token
+				context.insert(token)
+				try context.save()
+
+				print("✅ Token saved successfully")
+				print("- ID: \(token.tokenId)")
+				print("- Expires: \(String(describing: token.expiresAt))")
+			} catch {
+				print("❌ Failed to save token: \(error)")
+				print("Error details: \(error.localizedDescription)")
+			}
+		}
+	}
+
+	private func loadExistingToken() -> DiscordToken? {
+		guard let context = modelContext else {
+			print("❌ Cannot load token: No ModelContext available")
+			return nil
+		}
+
+		var descriptor = FetchDescriptor<DiscordToken>()
+		descriptor.sortBy = [SortDescriptor(\DiscordToken.expiresAt, order: .reverse)]
+		descriptor.fetchLimit = 1
+
+		do {
+			let tokens = try context.fetch(descriptor)
+			print("🔍 Found \(tokens.count) tokens in store")
+			return tokens.first
+		} catch {
+			print("❌ Failed to fetch tokens: \(error)")
+			return nil
 		}
 	}
 
@@ -440,66 +466,17 @@ public final class DiscordManager: ObservableObject {
 		}
 	}
 
-	private func loadExistingToken() -> DiscordToken? {
-		guard let context = modelContext else {
-			print("❌ Cannot load token: No ModelContext available")
-			return nil
-		}
-
-		let descriptor = FetchDescriptor<DiscordToken>(
-			sortBy: [SortDescriptor(\.expiresAt, order: .reverse)]
-		)
-
-		do {
-			let tokens = try context.fetch(descriptor)
-			if let token = tokens.first {
-				print("🔑 Found existing token:")
-				print("- Access Token: \(token.accessToken.prefix(10))...")
-				print("- Expires At: \(token.expiresAt)")
-				print("- Needs Refresh: \(token.needsRefresh)")
-				return token
-			} else {
-				print("ℹ️ No existing token found in persistent store")
-				return nil
-			}
-		} catch {
-			print("❌ Failed to load token: \(error)")
-			return nil
-		}
-	}
-
-	private func saveToken(accessToken: String, refreshToken: String, expiresIn: TimeInterval) {
-		Task { @MainActor in
-			guard let context = modelContext else {
-				print("❌ Cannot save token: No ModelContext available")
-				return
-			}
-
-			print("💾 Saving new Discord token...")
-			print("- Access Token: \(accessToken.prefix(10))...")
-			print("- Refresh Token: \(refreshToken.prefix(10))...")
-			print("- Expires In: \(expiresIn) seconds")
-
-			let token = DiscordToken(
-				accessToken: accessToken,
-				refreshToken: refreshToken,
-				expiresIn: expiresIn
-			)
-			context.insert(token)
-
-			do {
-				try context.save()
-				print("✅ Token saved successfully to persistent store")
-			} catch {
-				print("❌ Failed to save token: \(error)")
-			}
-		}
-	}
-
 	public func refreshTokenIfNeeded() async {
-		guard let token = loadExistingToken(), token.needsRefresh else { return }
-		let refreshStr = makeDiscordString(from: token.refreshToken)
+		guard let token = loadExistingToken(),
+			let refreshToken = token.refreshToken,  // Now correctly handling optional
+			token.needsRefresh
+		else {
+			print("⚠️ No valid refresh token available")
+			return
+		}
+		let refreshStr = makeDiscordString(from: refreshToken)
 
+		print("🔄 Refreshing token using refresh token")
 		Discord_Client_RefreshToken(
 			client,
 			applicationId,
@@ -512,8 +489,10 @@ public final class DiscordManager: ObservableObject {
 
 	public func setupWithExistingToken() async {
 		await MainActor.run {
-			guard let token = loadExistingToken() else {
-				print("⚠️ No existing token found, needs manual authorization")
+			guard let token = loadExistingToken(),
+				let accessToken = token.accessToken  // Now correctly handling optional
+			else {
+				print("⚠️ No existing token found or token invalid")
 				return
 			}
 
@@ -522,7 +501,7 @@ public final class DiscordManager: ObservableObject {
 				Task { await refreshTokenIfNeeded() }
 			} else {
 				print("✅ Using existing valid token")
-				let accessStr = makeDiscordString(from: token.accessToken)
+				let accessStr = makeDiscordString(from: accessToken)
 				Discord_Client_UpdateToken(
 					client,
 					Discord_AuthorizationTokenType_Bearer,
@@ -623,36 +602,57 @@ public final class DiscordManager: ObservableObject {
 			result, token, refreshToken, tokenType, expiresIn, scope, userData in
 			let manager = Unmanaged<DiscordManager>.fromOpaque(userData!).takeUnretainedValue()
 
-			// Update token and connect
-			let updateCallback:
-				@convention(c) (
-					UnsafeMutablePointer<Discord_ClientResult>?, UnsafeMutableRawPointer?
-				) -> Void = { result, userData in
-					let manager = Unmanaged<DiscordManager>.fromOpaque(userData!)
-						.takeUnretainedValue()
-					print("🔑 Token updated, connecting to Discord...")
-					Discord_Client_Connect(manager.client)
-				}
+			if let tokenPtr = token.ptr,
+				let refreshPtr = refreshToken.ptr,
+				let tokenStr = String(
+					bytes: UnsafeRawBufferPointer(start: tokenPtr, count: Int(token.size)),
+					encoding: .utf8),
+				let refreshStr = String(
+					bytes: UnsafeRawBufferPointer(start: refreshPtr, count: Int(refreshToken.size)),
+					encoding: .utf8)
+			{
+				print("🎟️ Received token from auth flow")
 
-			Discord_Client_UpdateToken(
-				manager.client,
-				Discord_AuthorizationTokenType_Bearer,
-				token,
-				updateCallback,
-				nil,
-				userData
-			)
+				// Save token first
+				Task { @MainActor in
+					await manager.updateStoredToken(
+						accessToken: tokenStr,
+						refreshToken: refreshStr,
+						expiresIn: TimeInterval(expiresIn)
+					)
+
+					// Then update client token
+					print("🔑 Updating client with new token...")
+					let accessStr = manager.makeDiscordString(from: tokenStr)
+					Discord_Client_UpdateToken(
+						manager.client,
+						Discord_AuthorizationTokenType_Bearer,
+						token,
+						{ result, userData in
+							print("🔌 Connecting with new token...")
+							let manager = Unmanaged<DiscordManager>.fromOpaque(userData!)
+								.takeUnretainedValue()
+							Discord_Client_Connect(manager.client)
+						},
+						nil,
+						userData
+					)
+				}
+			}
 		}
 
 		Discord_Client_GetToken(
-			manager.client, manager.applicationId, code, verifierStr, redirectUri,
+			manager.client,
+			manager.applicationId,
+			code,
+			verifierStr,
+			redirectUri,
 			tokenCallback,
 			nil,
 			userData
 		)
 	}
 
-	// Remove any async/actor dependencies from deinit
 	deinit {
 		// Stop timer synchronously
 		updateTimer?.invalidate()
