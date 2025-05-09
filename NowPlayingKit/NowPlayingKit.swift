@@ -49,7 +49,9 @@ public final class NowPlayingManager {
 		// Start monitoring playback state
 		Task {
 			for await _ in player.queue.objectWillChange.values {
-                self.isPlaying = player.state.playbackStatus == .playing
+				await MainActor.run {
+					self.isPlaying = player.state.playbackStatus == .playing
+				}
 			}
 		}
 	}
@@ -64,7 +66,7 @@ public final class NowPlayingManager {
 			throw NowPlayingError.unauthorized
 		}
 
-        guard player.state.playbackStatus == .playing,
+		guard player.state.playbackStatus == .playing,
 			let entry = player.queue.currentEntry
 		else {
 			throw NowPlayingError.noCurrentEntry
