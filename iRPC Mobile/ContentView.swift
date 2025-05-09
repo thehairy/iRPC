@@ -143,9 +143,7 @@ struct ContentView: View {
 							}
 						}
 						.frame(height: 44)  // Add fixed height to prevent layout shifts
-						.animation(.easeInOut, value: discord.isAuthorizing)
-						.animation(.easeInOut, value: discord.isAuthenticated)
-						.animation(.easeInOut, value: discord.errorMessage)
+						.animation(.easeInOut, value: discord.isAuthorizing || discord.isAuthenticated || discord.errorMessage != nil)
 						.contextMenu {
 							Button("Refresh Token") {
 								Task {
