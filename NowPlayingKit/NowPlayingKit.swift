@@ -15,6 +15,7 @@ public enum NowPlayingError: Error {
 }
 
 public struct NowPlayingData: Sendable {
+    public let id: String
 	public let title: String
 	public let artist: String
 	public let album: String?
@@ -23,6 +24,7 @@ public struct NowPlayingData: Sendable {
 	public let duration: TimeInterval
 
 	public init(
+        id: String,
 		title: String,
 		artist: String,
 		album: String? = nil,
@@ -30,6 +32,7 @@ public struct NowPlayingData: Sendable {
 		playbackTime: TimeInterval = 0,
 		duration: TimeInterval = 1
 	) {
+        self.id = id
 		self.title = title
 		self.artist = artist
 		self.album = album
@@ -72,6 +75,7 @@ public final class NowPlayingManager {
 			throw NowPlayingError.noCurrentEntry
 		}
 
+        var id = ""
 		let title = entry.title
 		let artworkURL = entry.artwork?.url(width: 300, height: 300)
 		var artist = ""
@@ -81,10 +85,12 @@ public final class NowPlayingManager {
 		if let item = entry.item {
 			switch item {
 			case .song(let song):
+                id = song.id.rawValue
 				duration = song.duration ?? 1
 				artist = song.artistName
 				album = song.albumTitle
 			case .musicVideo(let musicVideo):
+                id = musicVideo.id.rawValue
 				duration = musicVideo.duration ?? 1
 				artist = musicVideo.artistName
 			@unknown default:
@@ -93,6 +99,7 @@ public final class NowPlayingManager {
 		}
 
 		return NowPlayingData(
+            id: id,
 			title: title,
 			artist: artist,
 			album: album,

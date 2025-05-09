@@ -14,7 +14,7 @@ import SwiftData
 import SwiftUI
 
 struct ContentView: View {
-	@State private var nowPlaying = NowPlayingData(title: "Loading...", artist: "")
+    @State private var nowPlaying = NowPlayingData(id: "", title: "Loading...", artist: "")
 	@State private var isAuthorized = false
 	@State private var isLoading = true
 	@State private var isAuthenticating = false
@@ -246,6 +246,7 @@ struct ContentView: View {
 
 			if discord.isAuthenticated && discord.isReady {
 				discord.updateCurrentPlayback(
+                    id: newPlayback.id,
 					title: newPlayback.title,
 					artist: newPlayback.artist,
 					duration: newPlayback.duration,
@@ -254,7 +255,7 @@ struct ContentView: View {
 				)
 			}
 		} catch {
-			nowPlaying = NowPlayingData(title: "No song playing", artist: "")
+            nowPlaying = NowPlayingData(id: "", title: "No song playing", artist: "")
 			discord.clearPlayback()
 		}
 	}
@@ -266,6 +267,7 @@ struct ContentView: View {
 
 			if discord.isAuthenticated {
 				discord.updateCurrentPlayback(
+                    id: current.id,
 					title: current.title,
 					artist: current.artist,
 					duration: current.duration,

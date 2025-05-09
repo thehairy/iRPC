@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3A4B2FD22DCE6FDF006DFDDA /* MusadoraKit in Frameworks */ = {isa = PBXBuildFile; productRef = 3A4B2FD12DCE6FDF006DFDDA /* MusadoraKit */; };
+		3A4B2FD42DCE700F006DFDDA /* MusadoraKit in Frameworks */ = {isa = PBXBuildFile; productRef = 3A4B2FD32DCE700F006DFDDA /* MusadoraKit */; };
 		3A7B0DFE2DCD1F3C003A9644 /* NowPlayingKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3A7B0DF32DCD1F3B003A9644 /* NowPlayingKit.framework */; };
 		3A7B0E082DCD1F3C003A9644 /* NowPlayingKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3A7B0DF32DCD1F3B003A9644 /* NowPlayingKit.framework */; };
 		3A7B0E092DCD1F3C003A9644 /* NowPlayingKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3A7B0DF32DCD1F3B003A9644 /* NowPlayingKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -190,6 +192,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3A4B2FD22DCE6FDF006DFDDA /* MusadoraKit in Frameworks */,
 				3AD80CD52DCD311D0010F492 /* DiscordSocialKit.framework in Frameworks */,
 				3A7B0E082DCD1F3C003A9644 /* NowPlayingKit.framework in Frameworks */,
 			);
@@ -228,6 +231,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3A4B2FD42DCE700F006DFDDA /* MusadoraKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -321,6 +325,7 @@
 			);
 			name = "iRPC Mobile";
 			packageProductDependencies = (
+				3A4B2FD12DCE6FDF006DFDDA /* MusadoraKit */,
 			);
 			productName = "iRPC Mobile";
 			productReference = 3A7B0DC22DCD1C8E003A9644 /* iRPC Mobile.app */;
@@ -438,6 +443,7 @@
 			);
 			name = DiscordSocialKit;
 			packageProductDependencies = (
+				3A4B2FD32DCE700F006DFDDA /* MusadoraKit */,
 			);
 			productName = DiscordSocialKit;
 			productReference = 3AD80CC02DCD311C0010F492 /* DiscordSocialKit.framework */;
@@ -541,6 +547,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				F4BE1C4E2DC94B49009B622C /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
+				3A4B2FD02DCE6FDF006DFDDA /* XCRemoteSwiftPackageReference "MusadoraKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F4BE1C322DC94AD5009B622C /* Products */;
@@ -1404,6 +1411,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		3A4B2FD02DCE6FDF006DFDDA /* XCRemoteSwiftPackageReference "MusadoraKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/rryam/MusadoraKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.1.0;
+			};
+		};
 		F4BE1C4E2DC94B49009B622C /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sindresorhus/LaunchAtLogin-Modern";
@@ -1415,6 +1430,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		3A4B2FD12DCE6FDF006DFDDA /* MusadoraKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3A4B2FD02DCE6FDF006DFDDA /* XCRemoteSwiftPackageReference "MusadoraKit" */;
+			productName = MusadoraKit;
+		};
+		3A4B2FD32DCE700F006DFDDA /* MusadoraKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3A4B2FD02DCE6FDF006DFDDA /* XCRemoteSwiftPackageReference "MusadoraKit" */;
+			productName = MusadoraKit;
+		};
 		F4BE1C4F2DC94B49009B622C /* LaunchAtLogin */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = F4BE1C4E2DC94B49009B622C /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */;

@@ -7,6 +7,7 @@
 
 import Combine
 import Foundation
+internal import MusadoraKit
 import SwiftData
 import discord_partner_sdk
 
@@ -16,6 +17,9 @@ public final class DiscordManager: ObservableObject {
 	private var applicationId: UInt64
 	private var verifier: Discord_AuthorizationCodeVerifier?
 	private var modelContext: ModelContext?
+
+	// Add artwork cache
+	private var artworkCache: [String: URL] = [:]
 
 	@Published public private(set) var isReady = false
 	@Published public private(set) var isAuthenticated = false
@@ -40,6 +44,7 @@ public final class DiscordManager: ObservableObject {
 	}
 
 	private var updateTimer: Timer?
+	private var lastId: String = ""
 	private var lastTitle: String = ""
 	private var lastArtist: String = ""
 	private var lastArtwork: URL? = nil
@@ -48,7 +53,8 @@ public final class DiscordManager: ObservableObject {
 
 	private var currentPlaybackInfo:
 		(
-			title: String, artist: String, duration: TimeInterval, currentTime: TimeInterval,
+			id: String, title: String, artist: String, duration: TimeInterval,
+			currentTime: TimeInterval,
 			artworkURL: URL?
 		)? = nil
 	private let presenceUpdateInterval: TimeInterval = 0.5
@@ -227,10 +233,17 @@ public final class DiscordManager: ObservableObject {
 				}
 			}
 
+	private func validateAssetURL(_ url: URL) -> Bool {
+		print("Validating asset URL: \(url)")
+		let urlString = url.absoluteString
+		return urlString.count >= 1 && urlString.count <= 256
+	}
+
 	public func updateRichPresence(
-		title: String, artist: String, duration: TimeInterval, currentTime: TimeInterval,
+		id: String, title: String, artist: String, duration: TimeInterval,
+		currentTime: TimeInterval,
 		artworkURL: URL? = nil
-	) {
+	) async {
 		guard let client = client else {
 			print("⚠️ Cannot update Rich Presence: No client")
 			return
@@ -257,8 +270,42 @@ public final class DiscordManager: ObservableObject {
 		Discord_Activity_Init(&activity)
 
 		// Set activity type first
-		//		Discord_Activity_SetType(&activity, Discord_ActivityTypes_Listening)
 		Discord_Activity_SetType(&activity, Discord_ActivityTypes_Playing)
+
+		// Set up asset
+		var assets = Discord_ActivityAssets()
+		Discord_ActivityAssets_Init(&assets)
+
+		// Check cache first
+		if let cachedArtwork = artworkCache[id] {
+			var artworkStr = makeDiscordString(from: cachedArtwork.absoluteString)
+			var hoverText = makeDiscordString(from: "\(title) by \(artist)")
+
+			Discord_ActivityAssets_SetLargeImage(&assets, &artworkStr)
+			Discord_ActivityAssets_SetLargeText(&assets, &hoverText)
+		} else {
+			// Fetch and cache if not found
+			do {
+				let song = try await MCatalog.song(id: MusicItemID(rawValue: id), fetch: [.albums])
+				if let artworkURL = song.albums?.first?.artwork?.url(width: 600, height: 600),
+					validateAssetURL(artworkURL)
+				{
+					// Cache the URL
+					artworkCache[id] = artworkURL
+
+					var artworkStr = makeDiscordString(from: artworkURL.absoluteString)
+					var hoverText = makeDiscordString(from: "\(title) by \(artist)")
+
+					Discord_ActivityAssets_SetLargeImage(&assets, &artworkStr)
+					Discord_ActivityAssets_SetLargeText(&assets, &hoverText)
+				}
+			} catch {
+				print("⚠️ Failed to fetch artwork: \(error)")
+			}
+		}
+
+		// Add assets to activity
+		Discord_Activity_SetAssets(&activity, &assets)
 
 		// Create and set name
 		let namePtr = makeStringBuffer(from: "Apple Music").ptr
@@ -312,17 +359,19 @@ public final class DiscordManager: ObservableObject {
 	}
 
 	public func updateCurrentPlayback(
+		id: String,
 		title: String,
 		artist: String,
 		duration: TimeInterval,
 		currentTime: TimeInterval,
 		artworkURL: URL?
 	) {
-		currentPlaybackInfo = (title, artist, duration, currentTime, artworkURL)
+		currentPlaybackInfo = (id, title, artist, duration, currentTime, artworkURL)
 	}
 
 	public func clearPlayback() {
 		currentPlaybackInfo = nil
+		artworkCache.removeAll()  // Clear cache when playback stops
 		clearRichPresence()
 	}
 
@@ -405,13 +454,16 @@ public final class DiscordManager: ObservableObject {
 	}
 
 	private func refreshRichPresence() {
-		updateRichPresence(
-			title: lastTitle,
-			artist: lastArtist,
-			duration: lastDuration,
-			currentTime: lastCurrentTime,
-			artworkURL: lastArtwork
-		)
+		Task {
+			await updateRichPresence(
+				id: lastId,
+				title: lastTitle,
+				artist: lastArtist,
+				duration: lastDuration,
+				currentTime: lastCurrentTime,
+				artworkURL: lastArtwork
+			)
+		}
 	}
 
 	private func stopUpdates() async {
@@ -446,7 +498,8 @@ public final class DiscordManager: ObservableObject {
 					self.isRunning
 				else { return }
 
-				self.updateRichPresence(
+				await self.updateRichPresence(
+					id: info.id,
 					title: info.title,
 					artist: info.artist,
 					duration: info.duration,
