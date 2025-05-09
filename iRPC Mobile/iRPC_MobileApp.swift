@@ -5,14 +5,28 @@
 //  Created by Adrian Castro on 8/5/25.
 //
 
-import SwiftUI
+import DiscordSocialKit
 import SwiftData
+import SwiftUI
 
 @main
 struct iRPC_MobileApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-    }
+	let container: ModelContainer
+
+	init() {
+		do {
+			let schema = Schema([DiscordToken.self])
+			let modelConfiguration = ModelConfiguration(schema: schema)
+			container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+		} catch {
+			fatalError("Failed to initialize ModelContainer: \(error)")
+		}
+	}
+
+	var body: some Scene {
+		WindowGroup {
+			ContentView()
+		}
+		.modelContainer(container)
+	}
 }

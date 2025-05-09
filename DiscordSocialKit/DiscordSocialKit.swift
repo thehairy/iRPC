@@ -7,17 +7,37 @@
 
 import Combine
 import Foundation
+import SwiftData
 import discord_partner_sdk
 
+@MainActor
 public final class DiscordManager: ObservableObject {
 	private var client: UnsafeMutablePointer<Discord_Client>?
 	private var applicationId: UInt64
 	private var verifier: Discord_AuthorizationCodeVerifier?
+	private var modelContext: ModelContext?
 
 	@Published public private(set) var isReady = false
 	@Published public private(set) var isAuthenticated = false
 	@Published public private(set) var errorMessage: String? = nil
 	@Published public private(set) var isAuthorizing = false
+	@Published public var isRunning = false
+
+	public func startPresenceUpdates() {
+		print("🎮 Starting Discord Rich Presence")
+		isRunning = true
+		Task { @MainActor in
+			await startUpdates()
+		}
+	}
+
+	public func stopPresenceUpdates() {
+		print("🛑 Stopping Discord Rich Presence")
+		isRunning = false
+		Task { @MainActor in
+			await stopUpdates()
+		}
+	}
 
 	private var updateTimer: Timer?
 	private var lastTitle: String = ""
@@ -68,6 +88,10 @@ public final class DiscordManager: ObservableObject {
 		setupClient()
 	}
 
+	public func setModelContext(_ context: ModelContext) {
+		self.modelContext = context
+	}
+
 	private func setupClient() {
 		print("🚀 Initializing Discord SDK...")
 
@@ -116,24 +140,6 @@ public final class DiscordManager: ObservableObject {
 			}
 		}
 
-		// Start presence update timer
-		Timer.scheduledTimer(withTimeInterval: presenceUpdateInterval, repeats: true) {
-			[weak self] _ in
-			guard let self = self,
-				let info = self.currentPlaybackInfo,
-				self.isAuthenticated,
-				self.isReady
-			else { return }
-
-			self.updateRichPresence(
-				title: info.title,
-				artist: info.artist,
-				duration: info.duration,
-				currentTime: info.currentTime,
-				artworkURL: info.artworkURL
-			)
-		}
-
 		print("✨ Discord SDK initialized successfully")
 	}
 
@@ -164,20 +170,10 @@ public final class DiscordManager: ObservableObject {
 	}
 
 	public func clearRichPresence() {
-		guard let client = client, isAuthenticated else { return }
+		guard let client = client else { return }
+		print("🧹 Clearing rich presence...")
 
-		var activity = Discord_Activity()
-		Discord_Activity_Init(&activity)
-
-		let callback:
-			@convention(c) (UnsafeMutablePointer<Discord_ClientResult>?, UnsafeMutableRawPointer?)
-				-> Void = { result, _ in
-					if let result = result, Discord_ClientResult_Successful(result) {
-						print("🧹 Rich Presence cleared")
-					}
-				}
-
-		Discord_Client_UpdateRichPresence(client, &activity, callback, nil, nil)
+		Discord_Client_ClearRichPresence(client)
 	}
 
 	struct RichPresenceContext {
@@ -261,25 +257,25 @@ public final class DiscordManager: ObservableObject {
 		Discord_Activity_Init(&activity)
 
 		// Set activity type first
-//		Discord_Activity_SetType(&activity, Discord_ActivityTypes_Listening)
-        Discord_Activity_SetType(&activity, Discord_ActivityTypes_Playing)
+		//		Discord_Activity_SetType(&activity, Discord_ActivityTypes_Listening)
+		Discord_Activity_SetType(&activity, Discord_ActivityTypes_Playing)
 
 		// Create and set name
-		let namePtr = makeStringBuffer(from: "Apple Music")
+		let namePtr = makeStringBuffer(from: "Apple Music").ptr
 		var nameStr = Discord_String()
 		nameStr.ptr = namePtr
 		nameStr.size = Int(Int32(4))
 		Discord_Activity_SetName(&activity, nameStr)
 
 		// Set details (title)
-		let detailsPtr = makeStringBuffer(from: title)
+		let detailsPtr = makeStringBuffer(from: title).ptr
 		var detailsStr = Discord_String()
 		detailsStr.ptr = detailsPtr
 		detailsStr.size = Int(Int32(title.utf8.count))
 		Discord_Activity_SetDetails(&activity, &detailsStr)
 
 		// Set state (artist)
-		let statePtr = makeStringBuffer(from: "by \(artist)")
+		let statePtr = makeStringBuffer(from: "by \(artist)").ptr
 		var stateStr = Discord_String()
 		stateStr.ptr = statePtr
 		stateStr.size = Int(Int32(("by \(artist)").utf8.count))
@@ -330,11 +326,56 @@ public final class DiscordManager: ObservableObject {
 		clearRichPresence()
 	}
 
-	private func makeStringBuffer(from string: String) -> UnsafeMutablePointer<UInt8> {
+	private func makeStringBuffer(from string: String) -> (
+		ptr: UnsafeMutablePointer<UInt8>, size: Int32
+	) {
 		let data = Array(string.utf8) + [0]
 		let ptr = UnsafeMutablePointer<UInt8>.allocate(capacity: data.count)
 		ptr.initialize(from: data, count: data.count)
-		return ptr
+		return (ptr, Int32(string.utf8.count))
+	}
+
+	private func makeDiscordString(from string: String) -> Discord_String {
+		var discordStr = Discord_String()
+		let buffer = makeStringBuffer(from: string)
+		discordStr.ptr = buffer.ptr
+		discordStr.size = Int(buffer.size)
+		return discordStr
+	}
+
+	private func updateStoredToken(
+		accessToken: String, refreshToken: String, expiresIn: TimeInterval
+	) async {
+		await MainActor.run {
+			print("🔄 Updating stored token...")
+			// Delete old tokens first
+			if let context = modelContext {
+				let descriptor = FetchDescriptor<DiscordToken>()
+				do {
+					let existingTokens = try context.fetch(descriptor)
+					print("Found \(existingTokens.count) existing tokens to remove")
+					for token in existingTokens {
+						context.delete(token)
+					}
+
+					// Create and save new token
+					let token = DiscordToken(
+						accessToken: accessToken,
+						refreshToken: refreshToken,
+						expiresIn: expiresIn
+					)
+					context.insert(token)
+					try context.save()
+					print("✅ New token saved successfully")
+					print("- Access Token: \(accessToken.prefix(10))...")
+					print("- Expires In: \(expiresIn) seconds")
+				} catch {
+					print("❌ Error managing tokens: \(error)")
+				}
+			} else {
+				print("❌ Cannot update token: No ModelContext available")
+			}
+		}
 	}
 
 	private func refreshRichPresence() {
@@ -347,10 +388,47 @@ public final class DiscordManager: ObservableObject {
 		)
 	}
 
-	private func stopUpdates() {
+	private func stopUpdates() async {
+		print("⏹️ Stopping presence updates")
+		// Stop timer first
 		updateTimer?.invalidate()
 		updateTimer = nil
+
+		// Clear state
+		currentPlaybackInfo = nil
+		lastTitle = ""
+		lastArtist = ""
+		lastArtwork = nil
+		lastDuration = 0
+		lastCurrentTime = 0
+
+		// Clear presence last
 		clearRichPresence()
+	}
+
+	private func startUpdates() async {
+		await stopUpdates()  // Clear any existing timer first
+
+		print("▶️ Starting presence updates")
+		updateTimer = Timer.scheduledTimer(withTimeInterval: presenceUpdateInterval, repeats: true)
+		{ [weak self] _ in
+			guard let self = self else { return }
+			Task { @MainActor in
+				guard let info = self.currentPlaybackInfo,
+					self.isAuthenticated,
+					self.isReady,
+					self.isRunning
+				else { return }
+
+				self.updateRichPresence(
+					title: info.title,
+					artist: info.artist,
+					duration: info.duration,
+					currentTime: info.currentTime,
+					artworkURL: info.artworkURL
+				)
+			}
+		}
 	}
 
 	private func handleError(_ message: String) {
@@ -359,6 +437,148 @@ public final class DiscordManager: ObservableObject {
 			self.isReady = false
 			self.isAuthenticated = false
 			self.isAuthorizing = false
+		}
+	}
+
+	private func loadExistingToken() -> DiscordToken? {
+		guard let context = modelContext else {
+			print("❌ Cannot load token: No ModelContext available")
+			return nil
+		}
+
+		let descriptor = FetchDescriptor<DiscordToken>(
+			sortBy: [SortDescriptor(\.expiresAt, order: .reverse)]
+		)
+
+		do {
+			let tokens = try context.fetch(descriptor)
+			if let token = tokens.first {
+				print("🔑 Found existing token:")
+				print("- Access Token: \(token.accessToken.prefix(10))...")
+				print("- Expires At: \(token.expiresAt)")
+				print("- Needs Refresh: \(token.needsRefresh)")
+				return token
+			} else {
+				print("ℹ️ No existing token found in persistent store")
+				return nil
+			}
+		} catch {
+			print("❌ Failed to load token: \(error)")
+			return nil
+		}
+	}
+
+	private func saveToken(accessToken: String, refreshToken: String, expiresIn: TimeInterval) {
+		Task { @MainActor in
+			guard let context = modelContext else {
+				print("❌ Cannot save token: No ModelContext available")
+				return
+			}
+
+			print("💾 Saving new Discord token...")
+			print("- Access Token: \(accessToken.prefix(10))...")
+			print("- Refresh Token: \(refreshToken.prefix(10))...")
+			print("- Expires In: \(expiresIn) seconds")
+
+			let token = DiscordToken(
+				accessToken: accessToken,
+				refreshToken: refreshToken,
+				expiresIn: expiresIn
+			)
+			context.insert(token)
+
+			do {
+				try context.save()
+				print("✅ Token saved successfully to persistent store")
+			} catch {
+				print("❌ Failed to save token: \(error)")
+			}
+		}
+	}
+
+	public func refreshTokenIfNeeded() async {
+		guard let token = loadExistingToken(), token.needsRefresh else { return }
+		let refreshStr = makeDiscordString(from: token.refreshToken)
+
+		Discord_Client_RefreshToken(
+			client,
+			applicationId,
+			refreshStr,
+			tokenCallback,
+			nil,
+			Unmanaged.passRetained(self).toOpaque()
+		)
+	}
+
+	public func setupWithExistingToken() async {
+		await MainActor.run {
+			guard let token = loadExistingToken() else {
+				print("⚠️ No existing token found, needs manual authorization")
+				return
+			}
+
+			if token.needsRefresh {
+				print("🔄 Token needs refresh, initiating refresh flow")
+				Task { await refreshTokenIfNeeded() }
+			} else {
+				print("✅ Using existing valid token")
+				let accessStr = makeDiscordString(from: token.accessToken)
+				Discord_Client_UpdateToken(
+					client,
+					Discord_AuthorizationTokenType_Bearer,
+					accessStr,
+					{ result, userData in
+						let manager = Unmanaged<DiscordManager>.fromOpaque(userData!)
+							.takeUnretainedValue()
+						print("🔑 Loaded token from storage, connecting to Discord...")
+						Discord_Client_Connect(manager.client)
+					},
+					nil,
+					Unmanaged.passRetained(self).toOpaque()
+				)
+			}
+		}
+	}
+
+	private let tokenCallback: Discord_Client_TokenExchangeCallback = {
+		result, token, refreshToken, tokenType, expiresIn, scope, userData in
+		let manager = Unmanaged<DiscordManager>.fromOpaque(userData!).takeUnretainedValue()
+
+		if let tokenPtr = token.ptr,
+			let refreshPtr = refreshToken.ptr,
+			let tokenStr = String(
+				bytes: UnsafeRawBufferPointer(start: tokenPtr, count: Int(token.size)),
+				encoding: .utf8),
+			let refreshStr = String(
+				bytes: UnsafeRawBufferPointer(start: refreshPtr, count: Int(refreshToken.size)),
+				encoding: .utf8)
+		{
+
+			print("🎟️ Received new token from Discord")
+			Task { @MainActor in
+				await manager.updateStoredToken(
+					accessToken: tokenStr,
+					refreshToken: refreshStr,
+					expiresIn: TimeInterval(expiresIn)
+				)
+
+				let accessStr = manager.makeDiscordString(from: tokenStr)
+				Discord_Client_UpdateToken(
+					manager.client,
+					Discord_AuthorizationTokenType_Bearer,
+					accessStr,
+					{ result, userData in
+						let manager = Unmanaged<DiscordManager>.fromOpaque(userData!)
+							.takeUnretainedValue()
+						print("🔑 Token updated, connecting to Discord...")
+						Discord_Client_Connect(manager.client)
+					},
+					nil,
+					userData
+				)
+			}
+		} else {
+			print("❌ Failed to parse token data from Discord")
 		}
 	}
 
@@ -432,9 +652,27 @@ public final class DiscordManager: ObservableObject {
 		)
 	}
 
+	// Remove any async/actor dependencies from deinit
 	deinit {
-		stopUpdates()
+		// Stop timer synchronously
+		updateTimer?.invalidate()
+		updateTimer = nil
+
+		// Clear state
+		currentPlaybackInfo = nil
+		lastTitle = ""
+		lastArtist = ""
+		lastArtwork = nil
+		lastDuration = 0
+		lastCurrentTime = 0
+
+		// Clear client
 		if let client = client {
+			// Basic presence clear without callback
+			var activity = Discord_Activity()
+			Discord_Activity_Init(&activity)
+			Discord_Client_UpdateRichPresence(client, &activity, nil, nil, nil)
+
 			Discord_Client_Drop(client)
 			client.deallocate()
 		}

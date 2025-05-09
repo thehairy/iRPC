@@ -7,6 +7,7 @@
 
 // ContentView.swift
 
+import Combine
 import DiscordSocialKit
 import NowPlayingKit
 import SwiftUI
@@ -18,7 +19,7 @@ struct ContentView: View {
 	private let manager = NowPlayingManager.shared
 	@State private var lastUpdateTime: TimeInterval = 0
 	private let updateInterval: TimeInterval = 1
-	private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+	@Environment(\.modelContext) private var modelContext
 
 	var body: some View {
 		VStack(spacing: 20) {
@@ -140,6 +141,29 @@ struct ContentView: View {
 						.animation(.easeInOut, value: discord.isAuthorizing)
 						.animation(.easeInOut, value: discord.isAuthenticated)
 						.animation(.easeInOut, value: discord.errorMessage)
+						.contextMenu {
+							Button("Refresh Token") {
+								Task {
+									await discord.refreshTokenIfNeeded()
+								}
+							}
+							Button("Reauthorize") {
+								discord.authorize()
+							}
+						}
+
+						if discord.isAuthenticated {
+							Button(action: {
+								if discord.isRunning {
+									discord.stopPresenceUpdates()
+								} else {
+									discord.startPresenceUpdates()
+								}
+							}) {
+								Text(discord.isRunning ? "Stop RPC" : "Start RPC")
+							}
+							.buttonStyle(.borderedProminent)
+						}
 					}
 					.padding()
 					.background(Color.secondary.opacity(0.1))
@@ -149,9 +173,14 @@ struct ContentView: View {
 		}
 		.padding()
 		.task {
+			await MainActor.run {
+				discord.setModelContext(modelContext)
+			}
+
 			await requestAuthorization()
 			if isAuthorized {
 				await updateNowPlaying()
+				await discord.setupWithExistingToken()
 			}
 		}
 		.onReceive(timer) { _ in
@@ -216,5 +245,13 @@ struct ContentView: View {
 		let minutes = Int(time) / 60
 		let seconds = Int(time) % 60
 		return String(format: "%02d:%02d", minutes, seconds)
+	}
+
+	private func setup() {
+		discord.setModelContext(modelContext)
+	}
+
+	private var timer: Publishers.Autoconnect<Timer.TimerPublisher> {
+		Timer.publish(every: updateInterval, on: .main, in: .common).autoconnect()
 	}
 }
