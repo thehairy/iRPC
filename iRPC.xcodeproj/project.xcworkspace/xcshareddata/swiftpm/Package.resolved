@@ -1,5 +1,5 @@
 {
-  "originHash" : "aae61040c30e63b9cf0f5455365680cfeabef0aac829c0941d4d6f6180010fc9",
+  "originHash" : "06b051cfa1ff07d5a66c7824b927aeefec860638332d01b00b3127dcb358051b",
   "pins" : [
     {
       "identity" : "launchatlogin-modern",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "a04ec1c363be3627734f6dad757d82f5d4fa8fcc",
         "version" : "1.1.0"
+      }
+    },
+    {
+      "identity" : "musadorakit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/rryam/MusadoraKit",
+      "state" : {
+        "revision" : "ec63ef1bdb9c00457f3b1ab54ecd1d8fa96bdc72",
+        "version" : "6.1.0"
       }
     }
   ],
