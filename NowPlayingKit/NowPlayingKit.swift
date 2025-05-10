@@ -15,7 +15,7 @@ public enum NowPlayingError: Error {
 }
 
 public struct NowPlayingData: Sendable {
-    public let id: String
+	public let id: String
 	public let title: String
 	public let artist: String
 	public let album: String?
@@ -24,7 +24,7 @@ public struct NowPlayingData: Sendable {
 	public let duration: TimeInterval
 
 	public init(
-        id: String,
+		id: String,
 		title: String,
 		artist: String,
 		album: String? = nil,
@@ -32,7 +32,7 @@ public struct NowPlayingData: Sendable {
 		playbackTime: TimeInterval = 0,
 		duration: TimeInterval = 1
 	) {
-        self.id = id
+		self.id = id
 		self.title = title
 		self.artist = artist
 		self.album = album
@@ -49,11 +49,17 @@ public final class NowPlayingManager {
 	@Published public private(set) var isPlaying = false
 
 	private init() {
-		// Start monitoring playback state
+		// Set initial state
+		self.isPlaying = player.state.playbackStatus == .playing
+
+		// Then monitor for changes
 		Task {
+			print("🎵 Initial playback state: \(self.isPlaying)")
 			for await _ in player.queue.objectWillChange.values {
 				await MainActor.run {
-					self.isPlaying = player.state.playbackStatus == .playing
+					let newState = player.state.playbackStatus == .playing
+					print("🎵 Playback state updating: \(self.isPlaying) -> \(newState)")
+					self.isPlaying = newState
 				}
 			}
 		}
@@ -75,7 +81,7 @@ public final class NowPlayingManager {
 			throw NowPlayingError.noCurrentEntry
 		}
 
-        var id = ""
+		var id = ""
 		let title = entry.title
 		let artworkURL = entry.artwork?.url(width: 300, height: 300)
 		var artist = ""
@@ -85,12 +91,12 @@ public final class NowPlayingManager {
 		if let item = entry.item {
 			switch item {
 			case .song(let song):
-                id = song.id.rawValue
+				id = song.id.rawValue
 				duration = song.duration ?? 1
 				artist = song.artistName
 				album = song.albumTitle
 			case .musicVideo(let musicVideo):
-                id = musicVideo.id.rawValue
+				id = musicVideo.id.rawValue
 				duration = musicVideo.duration ?? 1
 				artist = musicVideo.artistName
 			@unknown default:
@@ -99,7 +105,7 @@ public final class NowPlayingManager {
 		}
 
 		return NowPlayingData(
-            id: id,
+			id: id,
 			title: title,
 			artist: artist,
 			album: album,
