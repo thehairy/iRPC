@@ -45,8 +45,7 @@ struct ContentView: View {
 						NavigationLink {
 							DiscordSettingsView(
 								discord: discord,
-								isAuthenticating: $isAuthenticating,
-								userEnabledRPC: $userEnabledRPC
+								isAuthenticating: $isAuthenticating
 							)
 						} label: {
 							Label("Discord Settings", systemImage: "gear")
@@ -232,76 +231,90 @@ private struct NowPlayingView: View {
 		List {
 			// Now Playing Section
 			Section {
-				VStack(alignment: .center, spacing: 16) {
-					if let artworkURL = nowPlaying.artworkURL {
-						AsyncImage(url: artworkURL) { phase in
-							switch phase {
-							case .success(let image):
-								image
-									.resizable()
-									.aspectRatio(contentMode: .fill)
-									.frame(height: 300)
-									.clipShape(RoundedRectangle(cornerRadius: 12))
-							default:
-								RoundedRectangle(cornerRadius: 12)
-									.fill(.secondary.opacity(0.1))
-									.frame(height: 300)
-									.overlay {
-										ProgressView()
-									}
+				if nowPlaying.title == "Loading..." {
+					VStack(spacing: 16) {
+						ProgressView()
+							.controlSize(.large)
+						Text("Loading Music...")
+							.foregroundStyle(.secondary)
+					}
+					.frame(maxWidth: .infinity, minHeight: 200)
+				} else {
+					VStack(alignment: .center, spacing: 16) {
+						if let artworkURL = nowPlaying.artworkURL {
+							AsyncImage(url: artworkURL) { phase in
+								switch phase {
+								case .success(let image):
+									image
+										.resizable()
+										.aspectRatio(contentMode: .fill)
+										.frame(height: 300)
+										.clipShape(RoundedRectangle(cornerRadius: 12))
+								default:
+									RoundedRectangle(cornerRadius: 12)
+										.fill(.secondary.opacity(0.1))
+										.frame(height: 300)
+										.overlay {
+											ProgressView()
+										}
+								}
 							}
 						}
-					}
 
-					VStack(spacing: 8) {
-						Text(nowPlaying.title)
-							.font(.title3)
-							.bold()
-							.lineLimit(1)
+						VStack(spacing: 8) {
+							Text(nowPlaying.title)
+								.font(.title3)
+								.bold()
+								.lineLimit(1)
 
-						Text(nowPlaying.artist)
-							.foregroundStyle(.secondary)
-							.lineLimit(1)
-
-						if let album = nowPlaying.album {
-							Text(album)
-								.font(.subheadline)
+							Text(nowPlaying.artist)
 								.foregroundStyle(.secondary)
 								.lineLimit(1)
+
+							if let album = nowPlaying.album {
+								Text(album)
+									.font(.subheadline)
+									.foregroundStyle(.secondary)
+									.lineLimit(1)
+							}
+						}
+
+						// Playback Progress
+						VStack(spacing: 8) {
+							ProgressView(value: nowPlaying.playbackTime, total: nowPlaying.duration)
+								.tint(.blue)
+
+							HStack {
+								Text(formatTime(nowPlaying.playbackTime))
+								Spacer()
+								Text(formatTime(nowPlaying.duration))
+							}
+							.font(.caption)
+							.foregroundStyle(.secondary)
 						}
 					}
-
-					// Playback Progress
-					VStack(spacing: 8) {
-						ProgressView(value: nowPlaying.playbackTime, total: nowPlaying.duration)
-							.tint(.blue)
-
-						HStack {
-							Text(formatTime(nowPlaying.playbackTime))
-							Spacer()
-							Text(formatTime(nowPlaying.duration))
-						}
-						.font(.caption)
-						.foregroundStyle(.secondary)
-					}
+					.listRowInsets(EdgeInsets())
+					.padding()
 				}
-				.listRowInsets(EdgeInsets())
-				.padding()
 			}
 
-			// Discord Status Section
+			// Discord Status Section - Now always visible
 			Section {
 				VStack(spacing: 12) {
 					HStack {
-						Image("Discord")  // Assuming this is your SF Symbol
+						Image("Discord")
 							.resizable()
 							.aspectRatio(contentMode: .fit)
 							.frame(width: 24, height: 24)
 
 						if discord.isAuthorizing {
-							Text("Connecting...")
-								.foregroundStyle(.secondary)
-						} else if discord.isAuthenticated {
+							HStack(spacing: 4) {
+								Text("Connecting")
+									.foregroundStyle(.secondary)
+								ProgressView()
+									.scaleEffect(0.7)
+							}
+						} else if discord.isAuthenticated && discord.isReady {
 							HStack(spacing: 4) {
 								Text("Connected")
 									.foregroundStyle(.green)
@@ -311,14 +324,9 @@ private struct NowPlayingView: View {
 										.foregroundStyle(.secondary)
 								}
 							}
-						} else {
-							Text("Not Connected")
-								.foregroundStyle(.secondary)
-						}
 
-						Spacer()
+							Spacer()
 
-						if discord.isAuthenticated {
 							Toggle(isOn: $userEnabledRPC) {
 								Text("Rich Presence")
 									.fixedSize()
@@ -332,6 +340,9 @@ private struct NowPlayingView: View {
 									BackgroundController.shared.stop()
 								}
 							}
+						} else {
+							Text("Not Connected")
+								.foregroundStyle(.secondary)
 						}
 					}
 				}
@@ -357,7 +368,6 @@ private struct DiscordSettingsView: View {
 	@Environment(\.dismiss) private var dismiss
 	let discord: DiscordManager
 	@Binding var isAuthenticating: Bool
-	@Binding var userEnabledRPC: Bool
 
 	var body: some View {
 		List {
@@ -406,23 +416,6 @@ private struct DiscordSettingsView: View {
 			}
 
 			if discord.isAuthenticated {
-				Section {
-					Toggle("Enable Rich Presence", isOn: $userEnabledRPC)
-						.onChange(of: userEnabledRPC) { _, isEnabled in
-							if isEnabled {
-								discord.startPresenceUpdates()
-								BackgroundController.shared.start()
-							} else {
-								discord.stopPresenceUpdates()
-								BackgroundController.shared.stop()
-							}
-						}
-				} header: {
-					Text("Rich Presence")
-				} footer: {
-					Text("Show your currently playing track in Discord.")
-				}
-
 				Section {
 					Button(role: .destructive) {
 						discord.authorize()  // Re-authorize
