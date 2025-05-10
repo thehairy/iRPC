@@ -26,6 +26,19 @@ public final class DiscordManager: ObservableObject {
 	@Published public private(set) var errorMessage: String? = nil
 	@Published public private(set) var isAuthorizing = false
 	@Published public var isRunning = false
+	@Published public private(set) var username: String?
+	@Published public private(set) var globalName: String?  // Add display name
+	@Published public private(set) var userId: UInt64 = 0
+	@Published public private(set) var avatarURL: URL?
+
+	// Add user data cache structure
+	private struct UserData {
+		var username: String
+		var globalName: String?
+		var avatarURL: URL?
+		var userId: UInt64
+	}
+	private var cachedUserData: UserData?
 
 	public func startPresenceUpdates() {
 		print("🎮 Starting Discord Rich Presence")
@@ -59,12 +72,102 @@ public final class DiscordManager: ObservableObject {
 		)? = nil
 	private let presenceUpdateInterval: TimeInterval = 0.5
 
+	private func fetchUserInfo() {
+		guard let client = client else { return }
+
+		let userHandle = Discord_UserHandle()
+		let userHandlePtr = UnsafeMutablePointer<Discord_UserHandle>.allocate(capacity: 1)
+		userHandlePtr.initialize(to: userHandle)
+
+		Discord_Client_GetCurrentUser(client, userHandlePtr)
+
+		defer {
+			Discord_UserHandle_Drop(userHandlePtr)
+			userHandlePtr.deallocate()
+		}
+
+		// Get username
+		var usernameStr = Discord_String()
+		Discord_UserHandle_Username(userHandlePtr, &usernameStr)
+
+		if let usernamePtr = usernameStr.ptr {
+			let username =
+				String(
+					bytes: UnsafeRawBufferPointer(
+						start: usernamePtr,
+						count: Int(usernameStr.size)
+					),
+					encoding: .utf8
+				) ?? ""
+
+			// Get display name
+			var displayNameStr = Discord_String()
+			Discord_UserHandle_DisplayName(userHandlePtr, &displayNameStr)
+
+			let globalName: String? = {
+				if let displayNamePtr = displayNameStr.ptr {
+					return String(
+						bytes: UnsafeRawBufferPointer(
+							start: displayNamePtr,
+							count: Int(displayNameStr.size)
+						),
+						encoding: .utf8
+					)
+				}
+				return nil
+			}()
+
+			// Get avatar URL
+			var avatarUrlStr = Discord_String()
+			Discord_UserHandle_AvatarUrl(
+				userHandlePtr,
+				Discord_UserHandle_AvatarType_Png,
+				Discord_UserHandle_AvatarType_Gif,
+				&avatarUrlStr
+			)
+
+			let avatarURL: URL? = {
+				if let urlPtr = avatarUrlStr.ptr {
+					let urlString =
+						String(
+							bytes: UnsafeRawBufferPointer(
+								start: urlPtr,
+								count: Int(avatarUrlStr.size)
+							),
+							encoding: .utf8
+						) ?? ""
+					return URL(string: urlString)
+				}
+				return nil
+			}()
+
+			// Cache and update
+			let userData = UserData(
+				username: username,
+				globalName: globalName,
+				avatarURL: avatarURL,
+				userId: Discord_UserHandle_Id(userHandlePtr)
+			)
+
+			self.cachedUserData = userData
+			self.username = username
+			self.globalName = globalName
+			self.avatarURL = avatarURL
+			self.userId = Discord_UserHandle_Id(userHandlePtr)
+
+			print("✅ User info fetched and cached:")
+			print("- Username: \(username)")
+			print("- Display Name: \(globalName ?? "none")")
+			print("- Has Avatar: \(avatarURL != nil)")
+		}
+	}
+
 	private let statusCallback: Discord_Client_OnStatusChanged = {
 		status, error, errorDetail, userData in
 		let manager = Unmanaged<DiscordManager>.fromOpaque(userData!).takeUnretainedValue()
 		print("🔄 Status changed: \(status)")
 
-		DispatchQueue.main.async {
+		let work = DispatchWorkItem {
 			if error != Discord_Client_Error_None {
 				print("❌ Connection Error: \(error) - Details: \(errorDetail)")
 				manager.handleError("Connection error \(error): \(errorDetail)")
@@ -75,11 +178,24 @@ public final class DiscordManager: ObservableObject {
 			case Discord_Client_Status_Ready:
 				print("✅ Client is ready!")
 				manager.isReady = true
+				// Fetch user info when client is ready
+				manager.fetchUserInfo()
 			case Discord_Client_Status_Connected:
 				print("🔗 Client connected!")
 				manager.isAuthenticated = true
 				manager.isAuthorizing = false
 				manager.errorMessage = nil
+
+				// Use cached data if available
+				if let cached = manager.cachedUserData {
+					manager.username = cached.username
+					manager.globalName = cached.globalName
+					manager.avatarURL = cached.avatarURL
+					manager.userId = cached.userId
+				} else {
+					// Fetch if not cached
+					manager.fetchUserInfo()
+				}
 			case Discord_Client_Status_Disconnected:
 				print("❌ Client disconnected")
 				manager.isAuthenticated = false
@@ -87,6 +203,8 @@ public final class DiscordManager: ObservableObject {
 				break
 			}
 		}
+
+		DispatchQueue.main.async(execute: work)
 	}
 
 	public init(applicationId: UInt64) {
