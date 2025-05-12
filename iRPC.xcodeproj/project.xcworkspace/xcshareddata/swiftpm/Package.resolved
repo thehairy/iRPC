@@ -1,5 +1,5 @@
 {
-  "originHash" : "06b051cfa1ff07d5a66c7824b927aeefec860638332d01b00b3127dcb358051b",
+  "originHash" : "0942cf2e825236454195ee2d8fc05f608cbc49b154d20c183be90703b71d0d5c",
   "pins" : [
     {
       "identity" : "launchatlogin-modern",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "ec63ef1bdb9c00457f3b1ab54ecd1d8fa96bdc72",
         "version" : "6.1.0"
+      }
+    },
+    {
+      "identity" : "nowplayingkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/itoolio/NowPlayingKit",
+      "state" : {
+        "branch" : "main",
+        "revision" : "98da8e9672edddb29cf92bf7e10c52ac1369acf0"
       }
     }
   ],
