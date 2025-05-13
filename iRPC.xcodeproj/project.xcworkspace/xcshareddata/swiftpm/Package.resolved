@@ -7,7 +7,7 @@
       "location" : "https://github.com/itoolio/DiscordSocialKit",
       "state" : {
         "branch" : "main",
-        "revision" : "a36575a900d871bd224a9b5c0ecad50453be77c4"
+        "revision" : "425e949ef11b54823a4902ff34c8c02771c20e8c"
       }
     },
     {
@@ -34,7 +34,7 @@
       "location" : "https://github.com/itoolio/NowPlayingKit",
       "state" : {
         "branch" : "main",
-        "revision" : "98da8e9672edddb29cf92bf7e10c52ac1369acf0"
+        "revision" : "6b18f98ae1e0e23ff4f6dc8b63d6e321aa5aede6"
       }
     }
   ],

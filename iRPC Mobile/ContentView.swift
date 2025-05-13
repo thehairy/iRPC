@@ -12,6 +12,7 @@ import DiscordSocialKit
 import NowPlayingKit
 import SwiftData
 import SwiftUI
+import MusicKit
 
 struct ContentView: View {
     @State private var nowPlaying = NowPlayingData(id: "", title: "Loading...", artist: "")
@@ -25,6 +26,22 @@ struct ContentView: View {
     @State private var lastUpdateTime: TimeInterval = 0
     private let updateInterval: TimeInterval = 1
     @Environment(\.modelContext) private var modelContext
+    @State private var isMusicCurrentlyPlaying = false
+    @State private var toggleRefreshTrigger = UUID()
+    @State private var playbackSubscription: AnyCancellable?
+    @State private var onAppearExecuted = false
+    @State private var connectionCheckTimer: AnyCancellable?
+    @State private var forceConnectionRefresh = UUID()
+
+    // Direct state tracking to force UI updates
+    @State private var isDiscordAuthenticated = false
+    @State private var isDiscordReady = false
+    @State private var discordUsername: String? = nil
+    @State private var showDebugInfo = false  // Set to true to show debug info in UI
+
+    private var timer: Publishers.Autoconnect<Timer.TimerPublisher> {
+        Timer.publish(every: updateInterval, on: .main, in: .common).autoconnect()
+    }
 
     enum ConnectionState: Equatable {
         case connecting
@@ -54,12 +71,11 @@ struct ContentView: View {
     private var connectionState: ConnectionState {
         if discord.isAuthorizing || isAuthenticating || isLoading {
             return .connecting
-        } else if discord.isAuthenticated {
-            // If authenticated, keep showing connecting until ready
-            if discord.isReady {
-                return .connected(username: discord.username)
+        } else if isDiscordAuthenticated {  // Use our tracked state
+            if isDiscordReady {  // Use our tracked state
+                return .connected(username: discordUsername)
             } else {
-                return .connecting  // Keep showing connecting while waiting for ready state
+                return .connecting
             }
         } else if let error = discord.errorMessage {
             return .failed(error: error)
@@ -75,7 +91,6 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             List {
-                // Music Section First
                 if !isAuthorized {
                     Section {
                         AuthorizationView(requestAuthorization: requestAuthorization)
@@ -87,7 +102,6 @@ struct ContentView: View {
                     )
                 }
 
-                // Discord Status Section
                 Section {
                     VStack(spacing: 8) {
                         HStack {
@@ -96,40 +110,52 @@ struct ContentView: View {
                                 .aspectRatio(contentMode: .fit)
                                 .frame(width: 24, height: 24)
 
-                            ZStack {
-                                ConnectionStatusView(state: connectionState)
-                            }
-                            .animation(.easeInOut(duration: 0.3), value: connectionState)
+                            ConnectionStatusView(
+                                isAuthenticated: isDiscordAuthenticated,
+                                isReady: isDiscordReady,
+                                username: discordUsername
+                            )
 
                             Spacer()
+                        }
+
+                        // Debug info to show what's happening
+                        if showDebugInfo {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Auth: \(discord.isAuthenticated ? "✅" : "❌")")
+                                    Text("Ready: \(discord.isReady ? "✅" : "❌")")
+                                    Text("User: \(discord.username ?? "none")")
+                                }
+                                .font(.caption)
+                                .padding(6)
+                                .background(Color.gray.opacity(0.2))
+                                .cornerRadius(6)
+                                Spacer()
+                            }
                         }
                     }
 
                     if shouldShowRPCToggle {
                         Toggle("Enable Rich Presence", isOn: $userEnabledRPC)
-                            .transition(.opacity)
                             .onChange(of: userEnabledRPC) { _, isEnabled in
-                                withAnimation {
-                                    if isEnabled {
-                                        discord.startPresenceUpdates()
-                                        BackgroundController.shared.start()
-                                    } else {
-                                        discord.stopPresenceUpdates()
-                                        BackgroundController.shared.stop()
-                                    }
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    handleUserToggleRPC(enabled: isEnabled)
                                 }
                             }
+                            .id("toggle-\(toggleRefreshTrigger)")
                     }
                 } header: {
                     Text("Discord Status")
                 } footer: {
+                    // Use ConnectionFooterView instead
                     ConnectionFooterView(
-                        state: connectionState,
+                        isAuthenticated: isDiscordAuthenticated,
+                        isReady: isDiscordReady,
                         isPlaying: manager.isPlaying,
                         showRPCToggle: shouldShowRPCToggle,
                         userEnabledRPC: userEnabledRPC
                     )
-                    .animation(.easeInOut(duration: 0.3), value: connectionState)
                 }
             }
             .listStyle(.insetGrouped)
@@ -147,8 +173,31 @@ struct ContentView: View {
                 }
             }
         }
-        .animation(.easeInOut, value: shouldShowRPCToggle)
-        // Split Discord and Music initialization into separate tasks
+        .onChange(of: manager.isPlaying) { _, newValue in
+            print("🎵 Music playing state changed: \(newValue)")
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showRPCToggle = shouldShowRPCToggle
+                }
+
+                if newValue {
+                    print("▶️ Music started playing - updating UI and Discord")
+                    if userEnabledRPC && discord.isAuthenticated && discord.isReady {
+                        Task { await updateDiscordWithCurrentSong() }
+                    }
+                } else {
+                    print("⏸️ Music stopped playing")
+                    if userEnabledRPC && discord.isAuthenticated {
+                        print("🛑 Clearing Discord presence")
+                        discord.clearPlayback()
+                    }
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: SystemMusicPlayer.playbackStateDidChangeNotification)) { _ in
+            print("🎵📣 System Music Player state changed!")
+            handleMusicPlaybackStateChange()
+        }
         .task(priority: .high) {
             isLoading = true
             await MainActor.run {
@@ -156,7 +205,6 @@ struct ContentView: View {
             }
 
             let hasExistingToken = await checkExistingToken()
-
             if hasExistingToken {
                 isAuthenticating = true
                 await discord.setupWithExistingToken()
@@ -177,86 +225,256 @@ struct ContentView: View {
                 await updatePlaybackTime()
             }
         }
-        .onReceive(manager.queue.objectWillChange) { _ in
-            guard isAuthorized else { return }
-            Task {
-                await updateNowPlaying()
-            }
-        }
-        .onReceive(manager.$isPlaying) { isPlaying in
-            guard userEnabledRPC, discord.isAuthenticated else { return }
+        .onAppear {
+            if !onAppearExecuted {
+                onAppearExecuted = true
+                DispatchQueue.main.async {
+                    let isPlaying = manager.isPlaying
+                    print("📱 Initial music state: \(isPlaying)")
 
-            if isPlaying && !discord.isRunning {
-                print("▶️ Music started playing, starting RPC")
-                discord.startPresenceUpdates()
-            } else if !isPlaying && discord.isRunning {
-                print("⏸️ Music paused, stopping RPC")
-                discord.stopPresenceUpdates()
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showRPCToggle = discord.isAuthenticated &&
+                                        discord.isReady &&
+                                        (isPlaying || userEnabledRPC)
+                    }
+
+                    setupMusicStatusObservers()
+                    setupConnectionMonitoring()
+                }
+            }
+            handleMusicPlaybackStateChange()
+        }
+        .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in
+            updateTrackedDiscordState()
+        }
+    }
+
+    private func setupMusicStatusObservers() {
+        // Cancel any existing subscription
+        playbackSubscription?.cancel()
+
+        playbackSubscription = manager.playbackStatePublisher
+            .receive(on: RunLoop.main)
+            .sink { isPlaying in
+                print("🎹 Playback state publisher update: \(isPlaying)")
+                self.isMusicCurrentlyPlaying = isPlaying
+                self.handleMusicPlaybackStateChange()
+            }
+
+        print("🎧 Music status observers setup complete")
+    }
+
+    private func setupConnectionMonitoring() {
+        // Cancel any existing timer
+        connectionCheckTimer?.cancel()
+        
+        // Create a timer that checks connection status every 0.5 seconds
+        connectionCheckTimer = Timer.publish(every: 0.5, on: .main, in: .common)
+            .autoconnect()
+            .sink { _ in
+                // Always force refresh the connection state to ensure UI stays in sync
+                self.updateTrackedDiscordState()
+                
+                // Also update toggle visibility - silently (no logging)
+                let shouldShow = self.shouldShowRPCToggle
+                if self.showRPCToggle != shouldShow {
+                    DispatchQueue.main.async {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            self.showRPCToggle = shouldShow
+                        }
+                    }
+                }
+            }
+            
+        print("🔌 Discord connection monitoring started")
+    }
+
+    private func updateTrackedDiscordState() {
+        // Directly update our state variables from Discord
+        let authenticated = discord.isAuthenticated
+        let ready = discord.isReady
+        let username = discord.username
+        
+        // Only update UI if values have changed
+        if isDiscordAuthenticated != authenticated || 
+           isDiscordReady != ready ||
+           discordUsername != username {
+            
+            print("🔄 Discord state changed: Auth=\(authenticated) Ready=\(ready) User=\(username ?? "none")")
+            
+            // Update our tracked state
+            isDiscordAuthenticated = authenticated
+            isDiscordReady = ready
+            discordUsername = username
+            
+            // Force UI refresh
+            forceConnectionRefresh = UUID()
+        }
+    }
+
+    private func handleMusicPlaybackStateChange() {
+        let isCurrentlyPlaying = manager.isPlaying
+
+        print("🎮 Handling music state change: \(isCurrentlyPlaying ? "playing" : "paused")")
+
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                let shouldShow = self.discord.isAuthenticated &&
+                                self.discord.isReady &&
+                                (isCurrentlyPlaying || self.userEnabledRPC)
+
+                self.showRPCToggle = shouldShow
+                self.toggleRefreshTrigger = UUID()
+            }
+
+            if isCurrentlyPlaying {
+                if self.userEnabledRPC && self.discord.isAuthenticated && self.discord.isReady {
+                    Task { await self.updateDiscordWithCurrentSong() }
+                }
+            } else {
+                if self.userEnabledRPC && self.discord.isAuthenticated {
+                    self.discord.clearPlayback()
+                }
+            }
+
+            Task { await self.updateNowPlaying() }
+        }
+    }
+
+    private func updateToggleVisibility() {
+        let shouldShow = shouldShowRPCToggle
+        if showRPCToggle != shouldShow {
+            DispatchQueue.main.async {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    self.showRPCToggle = shouldShow
+                }
             }
         }
-        .onChange(of: discord.isAuthenticated) { _, newValue in
-            if newValue {
-                isAuthenticating = false
+    }
+
+    private func forceShowToggle() {
+        guard discord.isAuthenticated && discord.isReady else {
+            print("⚠️ Cannot show toggle - Discord not ready/authenticated")
+            return
+        }
+
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut) {
+                self.showRPCToggle = true
+                print("🎯 Forcing toggle visibility to true")
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeInOut) {
+                    self.showRPCToggle = true
+                }
             }
         }
-        .onChange(of: manager.isPlaying) { _, isPlaying in
-            showRPCToggle = shouldShowRPCToggle
+    }
+
+    private func checkMusicPlaybackState() {
+        let isPlaying = manager.isPlaying
+
+        print("🔎 Checking music state: \(isPlaying ? "playing" : "not playing")")
+
+        let shouldShow = discord.isAuthenticated && discord.isReady && (isPlaying || userEnabledRPC)
+
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                self.showRPCToggle = shouldShow
+
+                if isPlaying && shouldShow && self.userEnabledRPC {
+                    Task { await self.updateDiscordWithCurrentSong() }
+                }
+            }
         }
-        .onChange(of: userEnabledRPC) { _, isEnabled in
-            showRPCToggle = shouldShowRPCToggle
+    }
+
+    private func updateNowPlaying() async {
+        do {
+            let newPlayback = try await manager.getCurrentPlayback()
+            await MainActor.run {
+                nowPlaying = newPlayback
+                print("🎵 Now Playing updated: \(newPlayback.title)")
+
+                if userEnabledRPC && discord.isAuthenticated && discord.isReady && manager.isPlaying {
+                    updateDiscordDirectly(with: newPlayback)
+                }
+
+                updateToggleVisibility()
+            }
+        } catch {
+            print("⚠️ Error getting now playing: \(error.localizedDescription)")
+            await MainActor.run {
+                nowPlaying = NowPlayingData(id: "", title: "No song playing", artist: "")
+
+                if userEnabledRPC && discord.isAuthenticated {
+                    discord.clearPlayback()
+                }
+            }
+        }
+    }
+
+    private func updateDiscordDirectly(with playback: NowPlayingData) {
+        discord.updateCurrentPlayback(
+            id: playback.id,
+            title: playback.title,
+            artist: playback.artist,
+            duration: playback.duration,
+            currentTime: playback.playbackTime,
+            artworkURL: playback.artworkURL
+        )
+    }
+
+    private func updatePlaybackTime() async {
+        do {
+            let current = try await manager.getCurrentPlayback()
+            await MainActor.run {
+                nowPlaying = current
+
+                if userEnabledRPC && discord.isAuthenticated && discord.isReady && manager.isPlaying {
+                    updateDiscordDirectly(with: current)
+                }
+            }
+        } catch {
+        }
+    }
+
+    private func updateDiscordWithCurrentSong() async {
+        do {
+            guard manager.isPlaying else {
+                print("⚠️ Not updating Discord - music not playing")
+                return
+            }
+
+            let current = try await manager.getCurrentPlayback()
+            await MainActor.run {
+                print("🎮 Updating Discord with: \(current.title)")
+                updateDiscordDirectly(with: current)
+            }
+        } catch {
+            print("⚠️ Failed to update Discord: \(error.localizedDescription)")
+        }
+    }
+
+    private func handleUserToggleRPC(enabled: Bool) {
+        print("🎮 User toggled Discord RPC: \(enabled ? "ON" : "OFF")")
+
+        if enabled {
+            discord.startPresenceUpdates()
+            if manager.isPlaying {
+                Task { await updateDiscordWithCurrentSong() }
+            }
+            BackgroundController.shared.start()
+        } else {
+            discord.stopPresenceUpdates()
+            BackgroundController.shared.stop()
         }
     }
 
     private func requestAuthorization() async {
         let status = await manager.authorize()
         isAuthorized = status == .authorized
-    }
-
-    private func updateNowPlaying() async {
-        do {
-            let newPlayback = try await manager.getCurrentPlayback()
-            nowPlaying = newPlayback
-
-            if userEnabledRPC && discord.isAuthenticated && discord.isReady {
-                discord.updateCurrentPlayback(
-                    id: newPlayback.id,
-                    title: newPlayback.title,
-                    artist: newPlayback.artist,
-                    duration: newPlayback.duration,
-                    currentTime: newPlayback.playbackTime,
-                    artworkURL: newPlayback.artworkURL
-                )
-            }
-        } catch {
-            nowPlaying = NowPlayingData(id: "", title: "No song playing", artist: "")
-            if userEnabledRPC {
-                discord.clearPlayback()
-            }
-        }
-    }
-
-    private func updatePlaybackTime() async {
-        do {
-            let current = try await manager.getCurrentPlayback()
-            nowPlaying = current
-
-            if discord.isAuthenticated {
-                discord.updateCurrentPlayback(
-                    id: current.id,
-                    title: current.title,
-                    artist: current.artist,
-                    duration: current.duration,
-                    currentTime: current.playbackTime,
-                    artworkURL: current.artworkURL
-                )
-            }
-        } catch {
-            // Ignore errors during playback time updates
-        }
-    }
-
-    private func setup() {
-        discord.setModelContext(modelContext)
     }
 
     private func checkExistingToken() async -> Bool {
@@ -276,10 +494,6 @@ struct ContentView: View {
             print("❌ Failed to check for existing token: \(error)")
             return false
         }
-    }
-
-    private var timer: Publishers.Autoconnect<Timer.TimerPublisher> {
-        Timer.publish(every: updateInterval, on: .main, in: .common).autoconnect()
     }
 }
 
@@ -380,7 +594,6 @@ private struct NowPlayingView: View {
                         }
                     }
 
-                    // Playback Progress
                     VStack(spacing: 8) {
                         ProgressView(value: nowPlaying.playbackTime, total: nowPlaying.duration)
                             .tint(.blue)
@@ -455,7 +668,7 @@ private struct DiscordSettingsView: View {
             if discord.isAuthenticated {
                 Section {
                     Button(role: .destructive) {
-                        discord.authorize()  // Re-authorize
+                        discord.authorize()
                     } label: {
                         Label("Reconnect Account", systemImage: "arrow.clockwise")
                     }
@@ -470,51 +683,45 @@ private struct DiscordSettingsView: View {
 }
 
 private struct ConnectionStatusView: View {
-    let state: ContentView.ConnectionState
-
+    let isAuthenticated: Bool
+    let isReady: Bool
+    let username: String?
+    
     var body: some View {
         HStack(spacing: 4) {
-            switch state {
-            case .connecting, .authenticating:
+            if !isAuthenticated {
+                Text("Not Connected")
+                    .foregroundStyle(.secondary)
+            } else if !isReady {
                 Text("Connecting")
                     .foregroundStyle(.secondary)
                 ProgressView()
                     .scaleEffect(0.7)
-            case .connected(let username):
+            } else {
                 Text("Connected")
                     .foregroundStyle(.green)
                 if let username = username {
                     Text("as \(username)")
                         .foregroundStyle(.secondary)
                 }
-            case .failed:
-                Text("Failed to Connect")
-                    .foregroundStyle(.red)
-            case .disconnected:
-                Text("Not Connected")
-                    .foregroundStyle(.secondary)
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: state)
-        .transition(
-            .asymmetric(
-                insertion: .opacity.combined(with: .move(edge: .top)),
-                removal: .opacity.combined(with: .move(edge: .bottom))
-            ))
     }
 }
 
 private struct ConnectionFooterView: View {
-    let state: ContentView.ConnectionState
+    let isAuthenticated: Bool
+    let isReady: Bool
     let isPlaying: Bool
     let showRPCToggle: Bool
     let userEnabledRPC: Bool
 
     var body: some View {
-        switch state {
-        case .connecting, .authenticating:
+        if !isAuthenticated {
+            Text("Sign in with Discord to share your music status.")
+        } else if !isReady {
             Text("Establishing connection to Discord...")
-        case .connected:
+        } else {
             if showRPCToggle {
                 if userEnabledRPC {
                     if isPlaying {
@@ -528,11 +735,6 @@ private struct ConnectionFooterView: View {
             } else {
                 Text("Start playing music to enable Rich Presence.")
             }
-        case .failed(let error):
-            Text(error ?? "Connection failed")
-                .foregroundStyle(.red)
-        case .disconnected:
-            Text("Sign in with Discord to share your music status.")
         }
     }
 }
