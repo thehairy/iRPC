@@ -1,6 +1,15 @@
 {
-  "originHash" : "0942cf2e825236454195ee2d8fc05f608cbc49b154d20c183be90703b71d0d5c",
+  "originHash" : "6877820f68ed0e30abc083de5a690d9ff26d37ee9c58fb147196f7c12a3a6d6f",
   "pins" : [
+    {
+      "identity" : "discordsocialkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/itoolio/DiscordSocialKit",
+      "state" : {
+        "branch" : "main",
+        "revision" : "a36575a900d871bd224a9b5c0ecad50453be77c4"
+      }
+    },
     {
       "identity" : "launchatlogin-modern",
       "kind" : "remoteSourceControl",
