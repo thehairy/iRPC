@@ -15,7 +15,7 @@ struct iRPC_MobileApp: App {
 
 	init() {
 		do {
-			let schema = Schema([DiscordToken.self])
+			let schema = Schema([DiscordTokenModel.self])
 			let config = ModelConfiguration(
 				schema: schema,
 				isStoredInMemoryOnly: false,

@@ -1,6 +1,15 @@
 {
-  "originHash" : "06b051cfa1ff07d5a66c7824b927aeefec860638332d01b00b3127dcb358051b",
+  "originHash" : "6877820f68ed0e30abc083de5a690d9ff26d37ee9c58fb147196f7c12a3a6d6f",
   "pins" : [
+    {
+      "identity" : "discordsocialkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/itoolio/DiscordSocialKit",
+      "state" : {
+        "branch" : "main",
+        "revision" : "425e949ef11b54823a4902ff34c8c02771c20e8c"
+      }
+    },
     {
       "identity" : "launchatlogin-modern",
       "kind" : "remoteSourceControl",
@@ -17,6 +26,15 @@
       "state" : {
         "revision" : "ec63ef1bdb9c00457f3b1ab54ecd1d8fa96bdc72",
         "version" : "6.1.0"
+      }
+    },
+    {
+      "identity" : "nowplayingkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/itoolio/NowPlayingKit",
+      "state" : {
+        "branch" : "main",
+        "revision" : "6b18f98ae1e0e23ff4f6dc8b63d6e321aa5aede6"
       }
     }
   ],
