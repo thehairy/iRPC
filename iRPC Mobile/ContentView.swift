@@ -13,9 +13,12 @@ import NowPlayingKit
 import SwiftData
 import SwiftUI
 import MusicKit
+import MusadoraKit
 
 struct ContentView: View {
     @State private var nowPlaying = NowPlayingData(id: "", title: "Loading...", artist: "")
+    @State private var lastPlayed: Song?
+    @State private var isShowingLastPlayed = false
     @State private var isAuthorized = false
     @State private var isLoading = true
     @State private var isAuthenticating = false
@@ -98,7 +101,8 @@ struct ContentView: View {
                 } else {
                     NowPlayingView(
                         nowPlaying: nowPlaying,
-                        manager: manager
+                        manager: manager,
+                        isLastPlayed: isShowingLastPlayed
                     )
                 }
 
@@ -268,14 +272,12 @@ struct ContentView: View {
         // Cancel any existing timer
         connectionCheckTimer?.cancel()
         
-        // Create a timer that checks connection status every 0.5 seconds
         connectionCheckTimer = Timer.publish(every: 0.5, on: .main, in: .common)
             .autoconnect()
             .sink { _ in
                 // Always force refresh the connection state to ensure UI stays in sync
                 self.updateTrackedDiscordState()
                 
-                // Also update toggle visibility - silently (no logging)
                 let shouldShow = self.shouldShowRPCToggle
                 if self.showRPCToggle != shouldShow {
                     DispatchQueue.main.async {
@@ -391,9 +393,47 @@ struct ContentView: View {
     }
 
     private func updateNowPlaying() async {
+        // Check if music is playing first
+        if !manager.isPlaying {
+            // Not playing, so attempt to show the last played song
+            do {
+                let recentSongs = try await MHistory.recentlyPlayedSongs(limit: 1)
+                if let lastSong = recentSongs.first {
+                    await MainActor.run {
+                        print("🎵 No active playback, showing last played: \(lastSong.title)")
+                        lastPlayed = lastSong
+                        isShowingLastPlayed = true
+                        
+                        // Update nowPlaying with last played info
+                        nowPlaying = NowPlayingData(
+                            id: lastSong.id.rawValue,
+                            title: lastSong.title,
+                            artist: lastSong.artistName,
+                            album: lastSong.albumTitle,
+                            artworkURL: lastSong.artwork?.url(width: 300, height: 300),
+                            playbackTime: 0,
+                            duration: lastSong.duration ?? 0
+                        )
+                        
+                        if userEnabledRPC && discord.isAuthenticated {
+                            discord.clearPlayback()
+                        }
+                    }
+                } else {
+                    await showNoSongPlaying()
+                }
+            } catch {
+                print("⚠️ Failed to get recently played: \(error.localizedDescription)")
+                await showNoSongPlaying()
+            }
+            return
+        }
+        
+        // Music is actively playing, get current playback
         do {
             let newPlayback = try await manager.getCurrentPlayback()
             await MainActor.run {
+                isShowingLastPlayed = false
                 nowPlaying = newPlayback
                 print("🎵 Now Playing updated: \(newPlayback.title)")
 
@@ -405,12 +445,17 @@ struct ContentView: View {
             }
         } catch {
             print("⚠️ Error getting now playing: \(error.localizedDescription)")
-            await MainActor.run {
-                nowPlaying = NowPlayingData(id: "", title: "No song playing", artist: "")
-
-                if userEnabledRPC && discord.isAuthenticated {
-                    discord.clearPlayback()
-                }
+            await showNoSongPlaying()
+        }
+    }
+    
+    private func showNoSongPlaying() async {
+        await MainActor.run {
+            isShowingLastPlayed = false
+            nowPlaying = NowPlayingData(id: "", title: "No song playing", artist: "")
+            
+            if userEnabledRPC && discord.isAuthenticated {
+                discord.clearPlayback()
             }
         }
     }
@@ -543,6 +588,14 @@ private struct AuthorizationView: View {
 private struct NowPlayingView: View {
     let nowPlaying: NowPlayingData
     let manager: NowPlayingManager
+    let isLastPlayed: Bool
+    
+    // Updated initializer with default parameter
+    init(nowPlaying: NowPlayingData, manager: NowPlayingManager, isLastPlayed: Bool = false) {
+        self.nowPlaying = nowPlaying
+        self.manager = manager
+        self.isLastPlayed = isLastPlayed
+    }
 
     var body: some View {
         Section {
@@ -554,8 +607,37 @@ private struct NowPlayingView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 200)
+            } else if nowPlaying.title == "No song playing" {
+                VStack(spacing: 16) {
+                    Image(systemName: "music.note.list")
+                        .font(.system(size: 50))
+                        .foregroundStyle(.secondary)
+                    
+                    Text("No Music Playing")
+                        .font(.title3)
+                        .bold()
+                    
+                    Text("Play a song to see it here")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, minHeight: 200)
             } else {
                 VStack(alignment: .center, spacing: 16) {
+                    // Show last played banner if applicable
+                    if isLastPlayed {
+                        HStack {
+                            Image(systemName: "clock.arrow.circlepath")
+                            Text("Last Played")
+                                .font(.caption)
+                                .bold()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.secondary.opacity(0.2))
+                        .cornerRadius(20)
+                    }
+                    
+                    // ...existing artwork display code...
                     if let artworkURL = nowPlaying.artworkURL {
                         AsyncImage(url: artworkURL) { phase in
                             switch phase {
@@ -594,17 +676,20 @@ private struct NowPlayingView: View {
                         }
                     }
 
-                    VStack(spacing: 8) {
-                        ProgressView(value: nowPlaying.playbackTime, total: nowPlaying.duration)
-                            .tint(.blue)
+                    // Only show progress if not showing last played
+                    if !isLastPlayed {
+                        VStack(spacing: 8) {
+                            ProgressView(value: nowPlaying.playbackTime, total: nowPlaying.duration)
+                                .tint(.blue)
 
-                        HStack {
-                            Text(formatTime(nowPlaying.playbackTime))
-                            Spacer()
-                            Text(formatTime(nowPlaying.duration))
+                            HStack {
+                                Text(formatTime(nowPlaying.playbackTime))
+                                Spacer()
+                                Text(formatTime(nowPlaying.duration))
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                     }
                 }
                 .listRowInsets(EdgeInsets())
