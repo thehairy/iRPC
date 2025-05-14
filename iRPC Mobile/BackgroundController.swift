@@ -25,9 +25,6 @@ final class BackgroundController {
     private var audioStartTime: TimeInterval = 0
     private var playerNode: AVAudioPlayerNode?
     
-    // Track the length of our simulated audio in seconds (24 hours)
-    private let simulatedAudioDuration: TimeInterval = 24 * 60 * 60
-
     private init() {}
 
     func start() {
