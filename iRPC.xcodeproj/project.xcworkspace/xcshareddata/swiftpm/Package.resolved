@@ -1,5 +1,5 @@
 {
-  "originHash" : "06b051cfa1ff07d5a66c7824b927aeefec860638332d01b00b3127dcb358051b",
+  "originHash" : "01d15387dbf293c8cbd10b8ecd383ea5e19785cb7611c65db997680324205229",
   "pins" : [
     {
       "identity" : "launchatlogin-modern",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "ec63ef1bdb9c00457f3b1ab54ecd1d8fa96bdc72",
         "version" : "6.1.0"
+      }
+    },
+    {
+      "identity" : "scrobblekit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tfmart/ScrobbleKit",
+      "state" : {
+        "revision" : "e12df14677589e29919352e47a0c500cc2e81fde",
+        "version" : "1.1.1"
       }
     }
   ],

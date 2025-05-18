@@ -1,55 +1,34 @@
-//
-//  DiscordRPC.swift
-//  iRPC
-//
-//  Created by Sören Stabenow on 27.04.25.
-//
-
 import Foundation
-import Darwin // Required for socket operations and realpath
+import Darwin
 
-/// Defines errors that can occur during Discord RPC operations.
+@available(macOS 10.12, *)
+@available(iOS, unavailable, message: "This framework is only available on macOS")
+@available(tvOS, unavailable, message: "This framework is only available on macOS")
+@available(watchOS, unavailable, message: "This framework is only available on macOS")
 public enum DiscordRPCError: Error {
-    /// Thrown when the application is sandboxed and cannot access the required IPC sockets.
     case sandboxed
-    /// Thrown when no Discord IPC socket could be found in the standard temporary directories.
     case noSocketFound
-    /// Thrown when a POSIX C function call fails. Contains the error message and the `errno` code.
     case posixError(String, Int32)
-    /// Thrown when encoding or decoding JSON payloads fails. Contains the underlying error.
     case jsonError(Error)
 }
 
-/// Manages the connection and communication with the Discord client via its local IPC socket
-/// for Rich Presence updates.
+@available(macOS 10.12, *)
+@available(iOS, unavailable, message: "This framework is only available on macOS")
+@available(tvOS, unavailable, message: "This framework is only available on macOS")
+@available(watchOS, unavailable, message: "This framework is only available on macOS")
 public class DiscordRPC {
-    /// Shared singleton instance for accessing DiscordRPC functionality.
-    public static let shared = DiscordRPC()
-    private init() {} // Private initializer to enforce singleton pattern.
-
-    // MARK: - Private Properties
-
     private var socketHandle: FileHandle?
     private let readQueue = DispatchQueue(label: "dev.stabenow.iRPC.DiscordRPCReadQueue")
     private var heartbeatTimer: Timer?
-    private let clientID = "1366348807004098612"
-
-    // MARK: - Public Properties
-
-    /// Indicates whether the RPC connection is currently active. Set to `true` after a successful handshake/READY event.
+    private let clientID: String
+    
     public private(set) var isConnected = false
-    /// If the connection failed or disconnected unexpectedly, this holds the reason (`DiscordRPCError`).
     public private(set) var isFailedReason: DiscordRPCError?
-
-    // MARK: - Connection Management
-
-    /// Attempts to find and connect to the Discord IPC socket.
-    ///
-    /// Searches standard temporary directories for `discord-ipc-*`, establishes a connection,
-    /// sends the handshake, and starts the read loop and heartbeats.
-    /// Sets `isConnected` to true upon receiving the READY event from Discord.
-    ///
-    /// - Throws: `DiscordRPCError` if connection fails (e.g., sandboxed, socket not found, POSIX error).
+    
+    public init(clientID: String) {
+        self.clientID = clientID
+    }
+    
     public func connect() throws {
         self.log("Attempting to connect to Discord IPC...")
 
@@ -87,9 +66,8 @@ public class DiscordRPC {
                 let fileDescriptor = try connectUnixSocket(at: path)
                 socketHandle = FileHandle(fileDescriptor: fileDescriptor, closeOnDealloc: true)
                 self.log("Successfully connected to IPC socket at \(path). Waiting for READY event.")
-                // Start background tasks required for maintaining the connection
                 startReadLoop()
-                sendHandshake() // Initiate the handshake process
+                sendHandshake()
                 isFailedReason = nil
                 return
             } catch DiscordRPCError.posixError(let msg, let code) {
@@ -104,8 +82,6 @@ public class DiscordRPC {
         throw self.isFailedReason!
     }
 
-    /// Disconnects from the Discord IPC socket, stops heartbeats, and closes the file handle.
-    /// Sets `isConnected` to `false`.
     public func disconnect() {
         self.log("Disconnecting from Discord IPC...")
         heartbeatTimer?.invalidate()
@@ -116,71 +92,151 @@ public class DiscordRPC {
         self.log("Disconnected.")
     }
 
-    // MARK: - Presence Updates
-
-    /// Updates the user's Discord Rich Presence status based on the provided music info.
-    ///
-    /// This method constructs the appropriate payload, including timestamps, assets, and optional buttons,
-    /// and sends it to Discord via the `SET_ACTIVITY` command. It handles fetching album art asynchronously if requested.
-    /// Does nothing if `isConnected` is false.
-    ///
-    /// - Parameters:
-    ///   - song: A `MusicInfo` struct containing details about the currently playing track.
-    ///   - showAlbumArt: If true, attempts to fetch and display album art using `MusicController`. Defaults to true.
-    ///   - showButtons: If true, includes default action buttons (e.g., "Listen on Apple Music"). Defaults to true.
-    public func updatePresence(with song: MusicInfo, showAlbumArt: Bool = true, showButtons: Bool = true) {
-        guard isConnected else {
-            self.log("Cannot update presence: Not connected.", level: .warning)
-            return
-        }
-
-        let now = Date().timeIntervalSince1970
-        let startTimestamp = Int(now - song.position)
-        let endTimestamp = startTimestamp + Int(song.duration)
-
-        if showAlbumArt {
-            MusicController.fetchCoverURL(for: song) { [weak self] coverURL in
-                guard self?.isConnected == true else { return } // Check connection again in async callback
-                self?.completePresenceUpdate(song: song,
-                                             startTimestamp: startTimestamp,
-                                             endTimestamp: endTimestamp,
-                                             coverURL: coverURL,
-                                             showButtons: showButtons)
-            }
-        } else {
-            completePresenceUpdate(song: song,
-                                   startTimestamp: startTimestamp,
-                                   endTimestamp: endTimestamp,
-                                   coverURL: nil,
-                                   showButtons: showButtons)
+    @available(macOS 10.12, *)
+    @available(iOS, unavailable, message: "This framework is only available on macOS")
+    @available(tvOS, unavailable, message: "This framework is only available on macOS")
+    @available(watchOS, unavailable, message: "This framework is only available on macOS")
+    public struct ActivityAssets {
+        public let largeImage: String?
+        public let largeText: String?
+        public let smallImage: String?
+        public let smallText: String?
+        
+        public init(largeImage: String? = nil, largeText: String? = nil, 
+                    smallImage: String? = nil, smallText: String? = nil) {
+            self.largeImage = largeImage
+            self.largeText = largeText
+            self.smallImage = smallImage
+            self.smallText = smallText
         }
     }
+    
+    @available(macOS 10.12, *)
+    @available(iOS, unavailable, message: "This framework is only available on macOS")
+    @available(tvOS, unavailable, message: "This framework is only available on macOS")
+    @available(watchOS, unavailable, message: "This framework is only available on macOS")
+    public struct ActivityTimestamps {
+        public let start: Int?
+        public let end: Int?
+        
+        public init(start: Int? = nil, end: Int? = nil) {
+            self.start = start
+            self.end = end
+        }
+        
+        public static func elapsedTime(duration: TimeInterval, position: TimeInterval) -> ActivityTimestamps {
+            let now = Date().timeIntervalSince1970
+            let start = Int(now - position)
+            let end = start + Int(duration)
+            return ActivityTimestamps(start: start, end: end)
+        }
+    }
+    
+    @available(macOS 10.12, *)
+    @available(iOS, unavailable, message: "This framework is only available on macOS")
+    @available(tvOS, unavailable, message: "This framework is only available on macOS")
+    @available(watchOS, unavailable, message: "This framework is only available on macOS")
+    public struct ActivityButton {
+        public let label: String
+        public let url: String
+        
+        public init(label: String, url: String) {
+            self.label = label
+            self.url = url
+        }
+    }
+    
+    @available(macOS 10.12, *)
+    @available(iOS, unavailable, message: "This framework is only available on macOS")
+    @available(tvOS, unavailable, message: "This framework is only available on macOS")
+    @available(watchOS, unavailable, message: "This framework is only available on macOS")
+    public enum ActivityType: Int {
+        case playing = 0
+        case streaming = 1
+        case listening = 2
+        case watching = 3
+        case competing = 5
+    }
 
-    /// Clears the user's Discord Rich Presence status by sending an empty activity payload.
-    /// Does nothing if `isConnected` is false.
-    public func clearPresence() {
+    public func setActivity(type: ActivityType = .playing,
+                           state: String? = nil,
+                           details: String? = nil,
+                           timestamps: ActivityTimestamps? = nil,
+                           assets: ActivityAssets? = nil,
+                           buttons: [ActivityButton]? = nil) {
         guard isConnected else {
-            self.log("Cannot clear presence: Not connected.", level: .warning)
+            self.log("Cannot set activity: Not connected.", level: .warning)
             return
         }
-        self.log("Clearing Discord presence.")
+        
+        var activityPayload: [String: Any] = ["type": type.rawValue]
+        
+        if let state = state {
+            activityPayload["state"] = state
+        }
+        
+        if let details = details {
+            activityPayload["details"] = details
+        }
+        
+        if let timestamps = timestamps {
+            var timestampsDict: [String: Int] = [:]
+            if let start = timestamps.start {
+                timestampsDict["start"] = start
+            }
+            if let end = timestamps.end {
+                timestampsDict["end"] = end
+            }
+            if !timestampsDict.isEmpty {
+                activityPayload["timestamps"] = timestampsDict
+            }
+        }
+        
+        if let assets = assets {
+            var assetsDict: [String: String] = [:]
+            if let largeImage = assets.largeImage {
+                assetsDict["large_image"] = largeImage
+            }
+            if let largeText = assets.largeText {
+                assetsDict["large_text"] = largeText
+            }
+            if let smallImage = assets.smallImage {
+                assetsDict["small_image"] = smallImage
+            }
+            if let smallText = assets.smallText {
+                assetsDict["small_text"] = smallText
+            }
+            if !assetsDict.isEmpty {
+                activityPayload["assets"] = assetsDict
+            }
+        }
+        
+        if let buttons = buttons, !buttons.isEmpty {
+            activityPayload["buttons"] = buttons.map { ["label": $0.label, "url": $0.url] }
+        }
+        
+        self.log("Setting activity with payload: \(activityPayload)")
+        sendCmd("SET_ACTIVITY", args: ["pid": getpid(), "activity": activityPayload])
+    }
+    
+    public func clearActivity() {
+        guard isConnected else {
+            self.log("Cannot clear activity: Not connected.", level: .warning)
+            return
+        }
+        self.log("Clearing Discord activity.")
         sendCmd("SET_ACTIVITY", args: ["pid": getpid(), "activity": NSNull()])
     }
 
-    // MARK: - Private Helper Methods - Socket & Path
-
-    /// Resolves the real path of a given file path, handling symbolic links.
     private func resolveRealPath(_ path: String) -> String {
         var buffer = [Int8](repeating: 0, count: Int(PATH_MAX))
         if realpath(path, &buffer) != nil {
             return String(cString: buffer)
         } else {
-            return (path as NSString).standardizingPath // Fallback
+            return (path as NSString).standardizingPath
         }
     }
 
-    /// Creates and connects a Unix domain socket at the specified path.
-    /// - Throws: `DiscordRPCError.posixError` on failure.
     private func connectUnixSocket(at path: String) throws -> Int32 {
         var addr = sockaddr_un()
         addr.sun_len    = UInt8(MemoryLayout<sockaddr_un>.size)
@@ -204,11 +260,6 @@ public class DiscordRPC {
         return fd
     }
 
-    // MARK: - Private Helper Methods - Communication Loop & Protocol
-
-    /// Starts the asynchronous loop on `readQueue` to continuously read and handle messages from the socket.
-    /// Handles message framing (Opcode + Length prefix) and dispatches payloads to `handleMessage`.
-    /// Triggers disconnection if the loop terminates due to errors or socket closure.
     private func startReadLoop() {
         guard let handle = socketHandle else {
             self.log("Cannot start read loop: Socket handle is nil.", level: .error)
@@ -221,7 +272,6 @@ public class DiscordRPC {
 
             while self.socketHandle != nil {
                 do {
-                    // Read header
                     guard let headerData = try handle.read(upToCount: 8), headerData.count == 8 else {
                         self.log("Read loop: Failed to read full header or EOF reached.", level: .warning)
                         break
@@ -229,7 +279,6 @@ public class DiscordRPC {
                     let op = headerData.withUnsafeBytes { $0.load(as: Int32.self) }.littleEndian
                     let length = Int(headerData.withUnsafeBytes { $0.load(fromByteOffset: 4, as: Int32.self) }.littleEndian)
 
-                    // Read payload
                     var payloadData = Data()
                     if length > 0 {
                         guard let readData = try handle.read(upToCount: length), readData.count == length else {
@@ -239,7 +288,6 @@ public class DiscordRPC {
                         payloadData = readData
                     }
 
-                    // Process message
                     self.handleMessage(op: op, data: payloadData)
 
                 } catch let error as NSError where error.domain == NSPOSIXErrorDomain && error.code == Int(EBADF) {
@@ -252,7 +300,7 @@ public class DiscordRPC {
                     }
                     break
                 }
-            } // End while loop
+            }
 
             self.log("Read loop finished.")
             DispatchQueue.main.async {
@@ -264,7 +312,6 @@ public class DiscordRPC {
         }
     }
 
-    /// Sends the initial handshake message (Opcode 0) to Discord.
     private func sendHandshake() {
         let handshakePayload: [String: Any] = ["v": 1, "client_id": clientID]
         self.log("Sending handshake: \(handshakePayload)")
@@ -281,11 +328,10 @@ public class DiscordRPC {
         }
     }
 
-    /// Starts a timer on the main run loop to send heartbeat messages (Opcode 3) periodically.
     private func startHeartbeat() {
         DispatchQueue.main.async { [weak self] in
              guard let self = self else { return }
-            self.heartbeatTimer?.invalidate() // Stop existing timer if any
+            self.heartbeatTimer?.invalidate()
             self.heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { _ in
                 self.log("Sending heartbeat (Op 3)...")
                 self.sendFrame(op: 3, data: [:]) { error in
@@ -303,8 +349,6 @@ public class DiscordRPC {
         }
     }
 
-    /// Processes incoming messages from the read loop based on their Opcode.
-    /// Handles key events like READY (sets `isConnected=true`, starts heartbeats), Heartbeat ACKs, and Close requests.
     private func handleMessage(op: Int32, data: Data) {
         var jsonPayload: Any? = nil
         if !data.isEmpty {
@@ -312,12 +356,12 @@ public class DiscordRPC {
                 jsonPayload = try JSONSerialization.jsonObject(with: data, options: [])
             } catch {
                 self.log("Failed to decode JSON payload for Op \(op): \(error)", level: .warning)
-                return // Ignore messages with invalid JSON
+                return
             }
         }
 
         switch op {
-        case 1: // Frame (Dispatch)
+        case 1:
             guard let message = jsonPayload as? [String: Any],
                   let command = message["cmd"] as? String, command == "DISPATCH",
                   let eventType = message["evt"] as? String else {
@@ -327,18 +371,16 @@ public class DiscordRPC {
 
             self.log("Received Dispatch Event: \(eventType)")
             if eventType == "READY" {
-                // Connection is fully established.
                 isConnected = true
-                isFailedReason = nil // Clear failure state
+                isFailedReason = nil
                 self.log("Discord RPC connection READY.")
-                // Start heartbeats *after* READY is confirmed.
                 startHeartbeat()
             }
 
-        case 3: // Heartbeat ACK (Pong)
+        case 3:
             self.log("Received Heartbeat ACK (Op 3 - Pong). Connection alive.")
 
-        case 5: // Close
+        case 5:
             self.log("Received Close (Op 5) from Discord: \(jsonPayload ?? "No details").", level: .warning)
              DispatchQueue.main.async {
                  self.isFailedReason = .posixError("Discord closed connection", 0)
@@ -350,35 +392,6 @@ public class DiscordRPC {
         }
     }
 
-    /// Constructs the activity payload dictionary for presence updates.
-    private func completePresenceUpdate(song: MusicInfo, startTimestamp: Int, endTimestamp: Int, coverURL: URL?, showButtons: Bool) {
-        let largeImageKey = coverURL?.absoluteString ?? "applemusic" // Replace with your default asset key
-        let largeImageText = song.album.isEmpty ? "Unknown Album" : song.album
-        let smallImageKey = "applemusic"
-        let smallImageText = "Apple Music"
-
-        var activityPayload: [String: Any] = [
-            "type": 2, // Listening - https://discord-api-types.dev/api/discord-api-types-v10/enum/ActivityType#Listening
-            "state": song.artist.isEmpty ? "Unknown Artist" : song.artist,
-            "details": song.title.isEmpty ? "Unknown Title" : song.title,
-            "timestamps": ["start": startTimestamp, "end": endTimestamp],
-            "assets": [
-                "large_image": largeImageKey, "large_text": largeImageText,
-                "small_image": smallImageKey, "small_text": smallImageText
-            ]
-        ]
-
-        if showButtons {
-            activityPayload["buttons"] = [
-                ["label": "Listen on Apple Music", "url": "https://music.apple.com/"] // TODO: Grab song URL and display in button
-            ]
-        }
-
-        self.log("Sending presence update: \(song.title) by \(song.artist)")
-        sendCmd("SET_ACTIVITY", args: ["pid": getpid(), "activity": activityPayload])
-    }
-
-    /// Sends a command frame (Opcode 1) with the specified command name and arguments.
     private func sendCmd(_ cmd: String, args: [String: Any]) {
         let payload: [String: Any] = [
             "cmd": cmd,
@@ -393,9 +406,6 @@ public class DiscordRPC {
         }
     }
 
-    /// Encodes the given payload dictionary into a JSON string, prefixes it with the
-    /// Opcode and length (Little Endian), and writes the resulting packet to the socket handle.
-    /// Handles potential JSON encoding errors and socket write errors (like EPIPE).
     private func sendFrame(op: Int32, data: [String: Any], completion: ((Error?) -> Void)? = nil) {
         guard let handle = socketHandle else {
             self.log("Cannot send frame (Op \(op)): Socket handle is nil.", level: .error)
@@ -415,7 +425,7 @@ public class DiscordRPC {
             let packet = header + jsonData
 
             try handle.write(contentsOf: packet)
-            completion?(nil) // Success
+            completion?(nil)
         } catch let error as NSError where error.domain == NSPOSIXErrorDomain && error.code == Int(EPIPE) {
             self.log("Failed to send frame (Op \(op)): Broken pipe (EPIPE). Disconnecting.", level: .error)
              DispatchQueue.main.async {
@@ -434,12 +444,8 @@ public class DiscordRPC {
         }
     }
 
-
-    // MARK: - self.logging
-
     private enum logLevel: String { case info = "INFO", warning = "WARN", error = "ERROR" }
 
-    /// Simple internal self.logger.
     private func log(_ message: String, level: logLevel = .info) {
         print("[DiscordRPC][\(level.rawValue)] \(message)")
     }

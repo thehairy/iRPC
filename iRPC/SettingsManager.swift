@@ -24,6 +24,12 @@ class SettingsManager: ObservableObject {
     @Published var showAlbumArt: Bool
     /// Determines if action buttons (e.g., "Listen on Music") should be shown in the Discord Rich Presence.
     @Published var showButtons: Bool
+    /// The username of the last.fm account that should be used for syncing
+    @Published var lastfmUsername: String = ""
+    /// The password of the last.fm account that should be used for syncing
+    @Published var lastfmPassword: String = ""
+    /// Determines if last.fm updates should be pushed
+    @Published var lastfmEnabled: Bool
 
     // MARK: - Private Properties
 
@@ -32,6 +38,9 @@ class SettingsManager: ObservableObject {
         case launchAtLogin
         case showAlbumArt
         case showButtons
+        case lastfmUsername
+        case lastfmPassword
+        case lastfmEnabled
     }
 
     /// The interface to the iCloud Key-Value Store.
@@ -49,6 +58,9 @@ class SettingsManager: ObservableObject {
         launchAtLogin = kvStore.bool(forKey: Keys.launchAtLogin.rawValue) // Default false from extension
         showAlbumArt = kvStore.bool(forKey: Keys.showAlbumArt.rawValue, withDefaultValue: true)
         showButtons = kvStore.bool(forKey: Keys.showButtons.rawValue, withDefaultValue: true)
+        lastfmUsername = kvStore.string(forKey: Keys.lastfmUsername.rawValue) ?? ""
+        lastfmPassword = kvStore.string(forKey: Keys.lastfmPassword.rawValue) ?? ""
+        lastfmEnabled = kvStore.bool(forKey: Keys.lastfmEnabled.rawValue)
 
         // Observe notifications for changes made to the KVS from other devices or instances.
         NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification, object: kvStore)
@@ -63,7 +75,7 @@ class SettingsManager: ObservableObject {
         // Set up Combine publishers to automatically save local changes to KVS.
         setupPublishers()
 
-        print("[SettingsManager] Initialized with settings: LaunchAtLogin=\(launchAtLogin), ShowArt=\(showAlbumArt), ShowButtons=\(showButtons)")
+        print("[SettingsManager] Initialized with settings: LaunchAtLogin=\(launchAtLogin), ShowArt=\(showAlbumArt), ShowButtons=\(showButtons), LastfmUsername=\(lastfmUsername), LastfmPassword=\(String(repeating: "*", count: lastfmPassword.count)), LastfmEnabled=\(lastfmEnabled)")
     }
 
     // MARK: - Combine Setup & iCloud Syncing
@@ -98,6 +110,36 @@ class SettingsManager: ObservableObject {
             .sink { [weak self] newValue in
                 print("[SettingsManager] Saving showButtons=\(newValue) to iCloud KVS.")
                 self?.kvStore.set(newValue, forKey: Keys.showButtons.rawValue)
+                self?.kvStore.synchronize()
+            }
+            .store(in: &subscriptions)
+        
+        $lastfmUsername
+            .dropFirst()
+            .debounce(for: .milliseconds(200), scheduler: RunLoop.main)
+            .sink { [weak self] newValue in
+                print("[SettingsManager] Saving lastfmUsername=\(newValue) to iCloud KVS.")
+                self?.kvStore.set(newValue, forKey: Keys.lastfmUsername.rawValue)
+                self?.kvStore.synchronize()
+            }
+            .store(in: &subscriptions)
+        
+        $lastfmPassword
+            .dropFirst()
+            .debounce(for: .milliseconds(200), scheduler: RunLoop.main)
+            .sink { [weak self] newValue in
+                print("[SettingsManager] Saving lastfmPassword=\(String(repeating: "*", count: newValue.count)) to iCloud KVS.")
+                self?.kvStore.set(newValue, forKey: Keys.lastfmPassword.rawValue)
+                self?.kvStore.synchronize()
+            }
+            .store(in: &subscriptions)
+        
+        $lastfmEnabled
+            .dropFirst()
+            .debounce(for: .milliseconds(200), scheduler: RunLoop.main)
+            .sink { [weak self] newValue in
+                print("[SettingsManager] Saving lastfmEnabled=\(newValue) to iCloud KVS.")
+                self?.kvStore.set(newValue, forKey: Keys.lastfmEnabled.rawValue)
                 self?.kvStore.synchronize()
             }
             .store(in: &subscriptions)
@@ -156,6 +198,24 @@ class SettingsManager: ObservableObject {
                     if self.showButtons != newValue {
                         self.showButtons = newValue
                         print("[SettingsManager] Updated showButtons from iCloud: \(newValue)")
+                    }
+                case Keys.lastfmUsername.rawValue:
+                    let newValue = self.kvStore.string(forKey: key) ?? ""
+                    if self.lastfmUsername != newValue {
+                        self.lastfmUsername = newValue
+                        print("[SettingsManager] Updated lastfmUsername from iCloud: \(newValue)")
+                    }
+                case Keys.lastfmPassword.rawValue:
+                    let newValue = self.kvStore.string(forKey: key) ?? ""
+                    if self.lastfmPassword != newValue {
+                        self.lastfmPassword = newValue
+                        print("[SettingsManager] Updated lastfmPassword from iCloud: \(String(repeating: "*", count: newValue.count))")
+                    }
+                case Keys.lastfmEnabled.rawValue:
+                    let newValue = self.kvStore.bool(forKey: key)
+                    if self.lastfmEnabled != newValue {
+                        self.lastfmEnabled = newValue
+                        print("[SettingsManager] Updated lastfmEnabled from iCloud: \(newValue)")
                     }
                 default:
                     // Ignore keys not managed by this class.

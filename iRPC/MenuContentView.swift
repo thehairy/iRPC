@@ -7,10 +7,29 @@
 
 import SwiftUI
 import LaunchAtLogin
+import DiscordRPCKit
 
 // Shared notification name used to trigger a presence update, e.g., when settings change.
 extension Notification.Name {
     static let refreshDiscordPresence = Notification.Name("refreshDiscordPresenceNotification")
+}
+
+// Create a wrapper class to hold the DiscordRPC instance and make it available through SwiftUI environment
+class DiscordRPCManager: ObservableObject {
+    static let shared = DiscordRPCManager()
+    
+    @Published private(set) var discordRPC: DiscordRPC?
+    @Published private(set) var isConnected: Bool = false
+    @Published private(set) var failedReason: DiscordRPCError?
+    
+    func setInstance(_ instance: DiscordRPC) {
+        self.discordRPC = instance
+    }
+    
+    func updateStatus() {
+        isConnected = discordRPC?.isConnected ?? false
+        failedReason = discordRPC?.isFailedReason
+    }
 }
 
 /// The SwiftUI view displayed within the menu bar popover.
@@ -21,26 +40,21 @@ struct MenuContentView: View {
 
     // MARK: - State Properties
 
-    /// Tracks the current connection status reported by `DiscordRPC.shared`.
-    @State private var isConnected: Bool = false
-    /// Stores the reason for connection failure, if any, from `DiscordRPC.shared`.
-    @State private var isFailedReason: DiscordRPCError?
-    /// Observes and allows modification of shared application settings.
+    @StateObject private var rpcManager = DiscordRPCManager.shared
     @StateObject private var settings = SettingsManager.shared // Assuming SettingsManager is an ObservableObject
-    /// Holds the currently playing song information, updated periodically.
     @State private var currentSong: MusicInfo?
 
     // MARK: - Computed Properties for UI
 
     /// Provides a user-friendly string describing the current RPC connection status.
     private var connectionStatusText: String {
-        if isConnected {
+        if rpcManager.isConnected {
             return "Connected"
-        } else if case .noSocketFound = isFailedReason {
+        } else if case .noSocketFound = rpcManager.failedReason {
             return "Connecting / Retrying..." // Changed from "Failed" for better UX during retries
-        } else if case .sandboxed = isFailedReason {
+        } else if case .sandboxed = rpcManager.failedReason {
             return "Failed – Sandboxed" // Unrecoverable error state
-        } else if isFailedReason != nil {
+        } else if rpcManager.failedReason != nil {
              return "Failed" // Generic failure
         } else {
             return "Disconnected" // Initial state or manual disconnect
@@ -49,9 +63,9 @@ struct MenuContentView: View {
 
     /// Determines the color used for the connection status text.
     private var connectionStatusColor: Color {
-        if isConnected {
+        if rpcManager.isConnected {
             return .green // Use system green or a custom green
-        } else if case .noSocketFound = isFailedReason {
+        } else if case .noSocketFound = rpcManager.failedReason {
             return .orange // Indicate a potentially recoverable state (retrying)
         } else {
             return .red // Indicate disconnected or failed state
@@ -121,13 +135,50 @@ struct MenuContentView: View {
                 }
             
             Divider()
+            
+            
+            Text("last.fm Integration")
+                .padding(.top, 8)
+            
+            HStack {
+                Text("Username:")
+                    .font(.system(size: 12))
+                Spacer()
+                TextField("Username", text: $settings.lastfmUsername)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .frame(width: 120)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            
+            HStack {
+                Text("Password:")
+                    .font(.system(size: 12))
+                Spacer()
+                SecureField("Password", text: $settings.lastfmPassword)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .frame(width: 120)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            
+            Toggle("Enabled", isOn: $settings.lastfmEnabled)
+                .toggleStyle(CheckboxToggleStyle())
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+                .onChange(of: settings.lastfmEnabled) { _, _ in
+                    //NotificationCenter.default.post(name: .refreshDiscordPresence, object: nil)
+                }
+            
+            Divider()
 
             MenuButton(title: "Quit", systemImage: "power.circle", shortcut: "⌘Q") {
                 NSApplication.shared.terminate(nil)
             }
         }
         .padding(.vertical, 8)
-        .frame(width: 250)
+        .frame(width: 250) // Fixed width
+        .fixedSize(horizontal: true, vertical: true) // Force SwiftUI to respect this exact size
         .onAppear {
             startMonitoringRPC()
             startMonitoringSong()
@@ -137,21 +188,19 @@ struct MenuContentView: View {
     // MARK: - Private Helper Methods
 
     /// Starts a timer to periodically update the `isConnected` and `isFailedReason` state
-    /// based on the shared `DiscordRPC` instance.
+    /// based on the shared `DiscordRPCManager` instance.
     private func startMonitoringRPC() {
-        // Set initial state immediately
-        isConnected = DiscordRPC.shared.isConnected
-        isFailedReason = DiscordRPC.shared.isFailedReason
-
+        // Update status immediately
+        rpcManager.updateStatus()
+        
         // Avoid starting timer if sandboxed (unrecoverable error)
-        if case .sandboxed = isFailedReason {
+        if case .sandboxed = rpcManager.failedReason {
             return
         }
 
         // Schedule repeating timer
         Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            isConnected = DiscordRPC.shared.isConnected
-            isFailedReason = DiscordRPC.shared.isFailedReason
+            rpcManager.updateStatus()
         }
     }
 

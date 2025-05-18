@@ -15,6 +15,9 @@
 		3AD80CCB2DCD311D0010F492 /* DiscordSocialKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3AD80CC02DCD311C0010F492 /* DiscordSocialKit.framework */; };
 		3AD80CD52DCD311D0010F492 /* DiscordSocialKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3AD80CC02DCD311C0010F492 /* DiscordSocialKit.framework */; };
 		3AD80CD62DCD311D0010F492 /* DiscordSocialKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3AD80CC02DCD311C0010F492 /* DiscordSocialKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		F424566E2DDA0CAD005B7A51 /* DiscordRPCKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F42456662DDA0CAD005B7A51 /* DiscordRPCKit.framework */; };
+		F424566F2DDA0CAD005B7A51 /* DiscordRPCKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = F42456662DDA0CAD005B7A51 /* DiscordRPCKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		F42456762DDA0CF4005B7A51 /* ScrobbleKit in Frameworks */ = {isa = PBXBuildFile; productRef = F42456752DDA0CF4005B7A51 /* ScrobbleKit */; };
 		F49296B22DC9520600FA24D8 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = F49296B12DC9520600FA24D8 /* README.md */; };
 		F4BE1C502DC94B49009B622C /* LaunchAtLogin in Frameworks */ = {isa = PBXBuildFile; productRef = F4BE1C4F2DC94B49009B622C /* LaunchAtLogin */; };
 /* End PBXBuildFile section */
@@ -76,6 +79,13 @@
 			remoteGlobalIDString = 3AD80CBF2DCD311C0010F492;
 			remoteInfo = DiscordSocialKit;
 		};
+		F424566C2DDA0CAD005B7A51 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F4BE1C292DC94AD5009B622C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F42456652DDA0CAD005B7A51;
+			remoteInfo = DiscordRPCKit;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -101,6 +111,17 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F42456702DDA0CAD005B7A51 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				F424566F2DDA0CAD005B7A51 /* DiscordRPCKit.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -111,6 +132,7 @@
 		3A7B0DFD2DCD1F3C003A9644 /* NowPlayingKitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NowPlayingKitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3AD80CC02DCD311C0010F492 /* DiscordSocialKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = DiscordSocialKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		3AD80CCA2DCD311D0010F492 /* DiscordSocialKitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DiscordSocialKitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F42456662DDA0CAD005B7A51 /* DiscordRPCKit.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = DiscordRPCKit.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		F49296B12DC9520600FA24D8 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		F4BE1C312DC94AD5009B622C /* iRPC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iRPC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -180,6 +202,11 @@
 			path = DiscordSocialKitTests;
 			sourceTree = "<group>";
 		};
+		F42456672DDA0CAD005B7A51 /* DiscordRPCKit */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DiscordRPCKit;
+			sourceTree = "<group>";
+		};
 		F4BE1C332DC94AD5009B622C /* iRPC */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = iRPC;
@@ -243,10 +270,19 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F42456632DDA0CAD005B7A51 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F4BE1C2E2DC94AD5009B622C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F42456762DDA0CF4005B7A51 /* ScrobbleKit in Frameworks */,
+				F424566E2DDA0CAD005B7A51 /* DiscordRPCKit.framework in Frameworks */,
 				F4BE1C502DC94B49009B622C /* LaunchAtLogin in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -266,6 +302,7 @@
 				3A7B0E032DCD1F3C003A9644 /* NowPlayingKitTests */,
 				3AD80CC12DCD311C0010F492 /* DiscordSocialKit */,
 				3AD80CD02DCD311D0010F492 /* DiscordSocialKitTests */,
+				F42456672DDA0CAD005B7A51 /* DiscordRPCKit */,
 				F4BE1C322DC94AD5009B622C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -281,6 +318,7 @@
 				3A7B0DFD2DCD1F3C003A9644 /* NowPlayingKitTests.xctest */,
 				3AD80CC02DCD311C0010F492 /* DiscordSocialKit.framework */,
 				3AD80CCA2DCD311D0010F492 /* DiscordSocialKitTests.xctest */,
+				F42456662DDA0CAD005B7A51 /* DiscordRPCKit.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -296,6 +334,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		3AD80CBB2DCD311C0010F492 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F42456612DDA0CAD005B7A51 /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -473,6 +518,29 @@
 			productReference = 3AD80CCA2DCD311D0010F492 /* DiscordSocialKitTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		F42456652DDA0CAD005B7A51 /* DiscordRPCKit */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F42456732DDA0CAD005B7A51 /* Build configuration list for PBXNativeTarget "DiscordRPCKit" */;
+			buildPhases = (
+				F42456612DDA0CAD005B7A51 /* Headers */,
+				F42456622DDA0CAD005B7A51 /* Sources */,
+				F42456632DDA0CAD005B7A51 /* Frameworks */,
+				F42456642DDA0CAD005B7A51 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				F42456672DDA0CAD005B7A51 /* DiscordRPCKit */,
+			);
+			name = DiscordRPCKit;
+			packageProductDependencies = (
+			);
+			productName = DiscordRPCKit;
+			productReference = F42456662DDA0CAD005B7A51 /* DiscordRPCKit.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 		F4BE1C302DC94AD5009B622C /* iRPC */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F4BE1C3D2DC94AD6009B622C /* Build configuration list for PBXNativeTarget "iRPC" */;
@@ -480,10 +548,12 @@
 				F4BE1C2D2DC94AD5009B622C /* Sources */,
 				F4BE1C2E2DC94AD5009B622C /* Frameworks */,
 				F4BE1C2F2DC94AD5009B622C /* Resources */,
+				F42456702DDA0CAD005B7A51 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				F424566D2DDA0CAD005B7A51 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				F4BE1C332DC94AD5009B622C /* iRPC */,
@@ -491,6 +561,7 @@
 			name = iRPC;
 			packageProductDependencies = (
 				F4BE1C4F2DC94B49009B622C /* LaunchAtLogin */,
+				F42456752DDA0CF4005B7A51 /* ScrobbleKit */,
 			);
 			productName = iRPC;
 			productReference = F4BE1C312DC94AD5009B622C /* iRPC.app */;
@@ -531,6 +602,9 @@
 						CreatedOnToolsVersion = 16.3;
 						TestTargetID = 3A7B0DC12DCD1C8E003A9644;
 					};
+					F42456652DDA0CAD005B7A51 = {
+						CreatedOnToolsVersion = 16.3;
+					};
 					F4BE1C302DC94AD5009B622C = {
 						CreatedOnToolsVersion = 16.3;
 					};
@@ -548,6 +622,7 @@
 			packageReferences = (
 				F4BE1C4E2DC94B49009B622C /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */,
 				3A4B2FD02DCE6FDF006DFDDA /* XCRemoteSwiftPackageReference "MusadoraKit" */,
+				F42456742DDA0CF4005B7A51 /* XCRemoteSwiftPackageReference "ScrobbleKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F4BE1C322DC94AD5009B622C /* Products */;
@@ -562,6 +637,7 @@
 				3A7B0DFC2DCD1F3C003A9644 /* NowPlayingKitTests */,
 				3AD80CBF2DCD311C0010F492 /* DiscordSocialKit */,
 				3AD80CC92DCD311D0010F492 /* DiscordSocialKitTests */,
+				F42456652DDA0CAD005B7A51 /* DiscordRPCKit */,
 			);
 		};
 /* End PBXProject section */
@@ -610,6 +686,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		3AD80CC82DCD311D0010F492 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F42456642DDA0CAD005B7A51 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -676,6 +759,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F42456622DDA0CAD005B7A51 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F4BE1C2D2DC94AD5009B622C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -725,6 +815,11 @@
 			isa = PBXTargetDependency;
 			target = 3AD80CBF2DCD311C0010F492 /* DiscordSocialKit */;
 			targetProxy = 3AD80CD32DCD311D0010F492 /* PBXContainerItemProxy */;
+		};
+		F424566D2DDA0CAD005B7A51 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F42456652DDA0CAD005B7A51 /* DiscordRPCKit */;
+			targetProxy = F424566C2DDA0CAD005B7A51 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1134,6 +1229,76 @@
 			};
 			name = Release;
 		};
+		F42456712DDA0CAD005B7A51 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				PRODUCT_BUNDLE_IDENTIFIER = dev.stabenow.DiscordRPCKit;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INSTALL_MODULE = YES;
+				SWIFT_INSTALL_OBJC_HEADER = NO;
+				SWIFT_VERSION = 5.0;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
+		};
+		F42456722DDA0CAD005B7A51 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUILD_LIBRARY_FOR_DISTRIBUTION = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_MODULE_VERIFIER = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				PRODUCT_BUNDLE_IDENTIFIER = dev.stabenow.DiscordRPCKit;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_INSTALL_MODULE = YES;
+				SWIFT_INSTALL_OBJC_HEADER = NO;
+				SWIFT_VERSION = 5.0;
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Release;
+		};
 		F4BE1C3B2DC94AD6009B622C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -1392,6 +1557,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		F42456732DDA0CAD005B7A51 /* Build configuration list for PBXNativeTarget "DiscordRPCKit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F42456712DDA0CAD005B7A51 /* Debug */,
+				F42456722DDA0CAD005B7A51 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		F4BE1C2C2DC94AD5009B622C /* Build configuration list for PBXProject "iRPC" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -1421,6 +1595,14 @@
 				minimumVersion = 6.1.0;
 			};
 		};
+		F42456742DDA0CF4005B7A51 /* XCRemoteSwiftPackageReference "ScrobbleKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/tfmart/ScrobbleKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.1.1;
+			};
+		};
 		F4BE1C4E2DC94B49009B622C /* XCRemoteSwiftPackageReference "LaunchAtLogin-Modern" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sindresorhus/LaunchAtLogin-Modern";
@@ -1441,6 +1623,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 3A4B2FD02DCE6FDF006DFDDA /* XCRemoteSwiftPackageReference "MusadoraKit" */;
 			productName = MusadoraKit;
+		};
+		F42456752DDA0CF4005B7A51 /* ScrobbleKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F42456742DDA0CF4005B7A51 /* XCRemoteSwiftPackageReference "ScrobbleKit" */;
+			productName = ScrobbleKit;
 		};
 		F4BE1C4F2DC94B49009B622C /* LaunchAtLogin */ = {
 			isa = XCSwiftPackageProductDependency;
