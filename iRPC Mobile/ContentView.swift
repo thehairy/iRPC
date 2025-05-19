@@ -699,19 +699,17 @@ private struct NowPlayingView: View {
     }
 }
 
-// Update DiscordSettingsView to use the ViewModel
+// Update DiscordSettingsView to improve authentication flow
 private struct DiscordSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     let discord: DiscordManager
     @Binding var isAuthenticating: Bool
     
-    // Replace state variables with a StateObject ViewModel
     @StateObject private var viewModel: DiscordSettingsViewModel
     
     init(discord: DiscordManager, isAuthenticating: Binding<Bool>) {
         self.discord = discord
         self._isAuthenticating = isAuthenticating
-        // Initialize the ViewModel
         self._viewModel = StateObject(wrappedValue: DiscordSettingsViewModel(
             discord: discord,
             isAuthenticating: isAuthenticating
@@ -721,76 +719,80 @@ private struct DiscordSettingsView: View {
     var body: some View {
         List {
             Section {
-                if discord.isAuthenticated {
-                    if viewModel.isUserDataLoaded {
-                        // Show user profile when data is loaded
-                        HStack(spacing: 12) {
-                            if let avatarURL = discord.avatarURL {
-                                AsyncImage(url: avatarURL) { phase in
-                                    switch phase {
-                                    case .success(let image):
-                                        image
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(width: 48, height: 48)
-                                            .clipShape(Circle())
-                                    default:
-                                        Circle()
-                                            .fill(.secondary.opacity(0.2))
-                                            .frame(width: 48, height: 48)
-                                    }
-                                }
+                // Modified display logic to show loading state immediately when authenticating
+                if isAuthenticating || (discord.isAuthenticated && !viewModel.isUserDataLoaded) {
+                    // Show loading view immediately when authenticating or waiting for user data
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(.secondary.opacity(0.2))
+                            .frame(width: 48, height: 48)
+                            .overlay {
+                                ProgressView()
+                                    .controlSize(.small)
                             }
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(discord.globalName ?? discord.username ?? "")
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                Text("Loading account...")
                                     .font(.headline)
-
-                                Text("@\(discord.username ?? "")")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-                        }
-                        .padding(.vertical, 4)
-                        .id("profile-\(viewModel.refreshID)")
-                    } else {
-                        // Show loading view while waiting for user data
-                        HStack(spacing: 12) {
-                            Circle()
-                                .fill(.secondary.opacity(0.2))
-                                .frame(width: 48, height: 48)
-                                .overlay {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                }
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack(spacing: 8) {
-                                    Text("Loading account...")
-                                        .font(.headline)
-                                        .foregroundColor(.secondary)
-                                    ProgressView()
-                                        .controlSize(.small)
-                                }
-                                
-                                Text("Please wait...")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundColor(.secondary)
+                                ProgressView()
+                                    .controlSize(.small)
                             }
                             
-                            Spacer()
+                            Text("Please wait...")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 4)
-                        .id("loading-\(viewModel.refreshID)")
+                        
+                        Spacer()
                     }
+                    .padding(.vertical, 4)
+                    .id("loading-\(viewModel.refreshID)")
+                } else if discord.isAuthenticated && viewModel.isUserDataLoaded {
+                    // Show user profile when data is fully loaded
+                    HStack(spacing: 12) {
+                        if let avatarURL = discord.avatarURL {
+                            AsyncImage(url: avatarURL) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 48, height: 48)
+                                        .clipShape(Circle())
+                                default:
+                                    Circle()
+                                        .fill(.secondary.opacity(0.2))
+                                        .frame(width: 48, height: 48)
+                                }
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(discord.globalName ?? discord.username ?? "")
+                                .font(.headline)
+
+                            Text("@\(discord.username ?? "")")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                    .id("profile-\(viewModel.refreshID)")
                 } else {
+                    // Show authenticate button only when not authenticating AND not authenticated
                     Button {
+                        // Set authenticating state BEFORE calling authorize
                         isAuthenticating = true
-                        discord.authorize()
-                        // Use ViewModel to start observing auth changes
+                        
+                        // Start observing authentication changes
                         viewModel.startObservingAuthChanges()
+                        
+                        // Then initiate the authorization process
+                        discord.authorize()
                     } label: {
                         Label("Connect Discord Account", systemImage: "person.badge.key.fill")
                     }
@@ -799,12 +801,18 @@ private struct DiscordSettingsView: View {
                 Text("Account")
             }
 
-            if discord.isAuthenticated {
+            // Only show reconnect button when fully authenticated with user data
+            if discord.isAuthenticated && viewModel.isUserDataLoaded {
                 Section {
                     Button(role: .destructive) {
-                        discord.authorize()
-                        // Use ViewModel to start observing auth changes
+                        // Set authenticating state BEFORE reconnecting
+                        isAuthenticating = true
+                        
+                        // Start observing authentication changes
                         viewModel.startObservingAuthChanges()
+                        
+                        // Then reconnect
+                        discord.authorize()
                     } label: {
                         Label("Reconnect Account", systemImage: "arrow.clockwise")
                     }
@@ -820,6 +828,11 @@ private struct DiscordSettingsView: View {
             viewModel.checkInitialState()
         }
         .onChange(of: discord.isAuthenticated) { _, newValue in
+            if !newValue {
+                // If authorization is revoked/lost, make sure we're not in authenticating state
+                isAuthenticating = false
+            }
+            
             // Delegate to ViewModel
             viewModel.handleAuthenticationStateChange(newValue)
         }
