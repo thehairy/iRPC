@@ -767,9 +767,10 @@ private struct DiscordSettingsView: View {
                                         .frame(width: 48, height: 48)
                                 }
                             }
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(discord.globalName ?? discord.username ?? "")
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                Text("Loading account...")
                                     .font(.headline)
 
                                 Text("@\(discord.username ?? "")")
@@ -780,7 +781,7 @@ private struct DiscordSettingsView: View {
                             Spacer()
                         }
                         .padding(.vertical, 4)
-                        .id("profile-\(viewModel.refreshID)")
+                        .id("profile-\(refreshID)")
                     } else {
                         // Show loading view while waiting for user data
                         HStack(spacing: 12) {
@@ -809,7 +810,7 @@ private struct DiscordSettingsView: View {
                             Spacer()
                         }
                         .padding(.vertical, 4)
-                        .id("loading-\(viewModel.refreshID)")
+                        .id("loading-\(refreshID)")
                     }
                     .padding(.vertical, 4)
                     .id("profile-\(viewModel.refreshID)")
@@ -824,8 +825,8 @@ private struct DiscordSettingsView: View {
                         
                         // Then initiate the authorization process
                         discord.authorize()
-                        // Use ViewModel to start observing auth changes
-                        viewModel.startObservingAuthChanges()
+                        // Start observing auth changes when authentication begins
+                        startObservingAuthChanges()
                     } label: {
                         Label("Connect Discord Account", systemImage: "person.badge.key.fill")
                     }
@@ -846,8 +847,8 @@ private struct DiscordSettingsView: View {
                         
                         // Then reconnect
                         discord.authorize()
-                        // Use ViewModel to start observing auth changes
-                        viewModel.startObservingAuthChanges()
+                        // Start observing auth changes when authentication begins
+                        startObservingAuthChanges()
                     } label: {
                         Label("Reconnect Account", systemImage: "arrow.clockwise")
                     }
