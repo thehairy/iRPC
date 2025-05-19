@@ -199,6 +199,13 @@ struct ContentView: View {
             print("🎵📣 System Music Player state changed!")
             handleMusicPlaybackStateChange()
         }
+        .task(id: "initializeMusic") {
+            if isAuthorized {
+                // Immediately try to show music content regardless of Discord status
+                print("🎵 Initializing music display")
+                await updateNowPlaying(forceRefresh: true)
+            }
+        }
         .task(priority: .high) {
             isLoading = true
             await MainActor.run {
@@ -216,7 +223,7 @@ struct ContentView: View {
             await requestAuthorization()
             if isAuthorized {
                 print("🎵 Music access authorized")
-                await updateNowPlaying()
+                await updateNowPlaying(forceRefresh: true)
             }
             isLoading = false
         }
@@ -389,7 +396,13 @@ struct ContentView: View {
         }
     }
 
-    private func updateNowPlaying() async {
+    private func updateNowPlaying(forceRefresh: Bool = false) async {
+        // Skip if we're not authorized yet
+        guard isAuthorized else {
+            print("⚠️ Music not authorized yet, skipping updateNowPlaying")
+            return
+        }
+        
         // Check if music is playing first
         if !manager.isPlaying {
             // Not playing, so attempt to show the last played song
@@ -412,8 +425,17 @@ struct ContentView: View {
                             duration: lastSong.duration ?? 0
                         )
                         
-                        if userEnabledRPC && discord.isAuthenticated {
-                            discord.clearPlayback()
+                        // Only update Discord presence if specifically enabled
+                        if userEnabledRPC && discord.isAuthenticated && discord.isReady {
+                            // Add a small delay to ensure Discord is ready
+                            if forceRefresh {
+                                Task {
+                                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                                    discord.clearPlayback()
+                                }
+                            } else {
+                                discord.clearPlayback()
+                            }
                         }
                     }
                 } else {
@@ -434,10 +456,12 @@ struct ContentView: View {
                 nowPlaying = newPlayback
                 print("🎵 Now Playing updated: \(newPlayback.title)")
 
-                if userEnabledRPC && discord.isAuthenticated && discord.isReady && manager.isPlaying {
+                // Only update Discord if specifically enabled
+                if userEnabledRPC && discord.isAuthenticated && discord.isReady {
                     updateDiscordDirectly(with: newPlayback)
                 }
 
+                // Always update toggle visibility based on current state
                 updateToggleVisibility()
             }
         } catch {

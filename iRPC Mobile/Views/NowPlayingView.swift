@@ -8,20 +8,47 @@
 import SwiftUI
 import NowPlayingKit
 
-public enum PlaybackDisplayState {
+public enum PlaybackDisplayState: Equatable {
     case loading
     case noMusic
     case playing(NowPlayingData)
     
     // Determine state based on NowPlayingData
     static func from(nowPlaying: NowPlayingData) -> PlaybackDisplayState {
-        switch nowPlaying.title {
-        case "Loading...":
-            return .loading
-        case "No song playing":
-            return .noMusic
-        default:
+        if nowPlaying.id.isEmpty {
+            switch nowPlaying.title {
+            case "Loading...":
+                return .loading
+            case "No song playing":
+                return .noMusic
+            default:
+                // Last played songs still have content but no active ID
+                if !nowPlaying.title.isEmpty && !nowPlaying.artist.isEmpty {
+                    return .playing(nowPlaying)
+                } else {
+                    return .noMusic
+                }
+            }
+        } else {
+            // If there's an ID, it's definitely a real track
             return .playing(nowPlaying)
+        }
+    }
+    
+    // Custom implementation of Equatable since NowPlayingData may not conform to Equatable
+    public static func == (lhs: PlaybackDisplayState, rhs: PlaybackDisplayState) -> Bool {
+        switch (lhs, rhs) {
+        case (.loading, .loading):
+            return true
+        case (.noMusic, .noMusic):
+            return true
+        case (.playing(let lhsData), .playing(let rhsData)):
+            // Compare relevant properties rather than the entire object
+            return lhsData.id == rhsData.id && 
+                   lhsData.title == rhsData.title &&
+                   lhsData.artist == rhsData.artist
+        default:
+            return false
         }
     }
 }
@@ -52,6 +79,17 @@ public struct NowPlayingView: View {
                 EmptyMusicStateView()
             case .playing(let data):
                 PlayingContentView(nowPlaying: data, isLastPlayed: isLastPlayed)
+            }
+        }
+        // Add tracking to debug state transitions if needed
+        .onChange(of: displayState) { _, newState in
+            switch newState {
+            case .loading: 
+                print("🎵 NowPlayingView: Showing loading state")
+            case .noMusic:
+                print("🎵 NowPlayingView: Showing no music state")
+            case .playing(let data):
+                print("🎵 NowPlayingView: Showing playing state - \(data.title)")
             }
         }
     }
