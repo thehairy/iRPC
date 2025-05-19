@@ -767,18 +767,49 @@ private struct DiscordSettingsView: View {
                                         .frame(width: 48, height: 48)
                                 }
                             }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(discord.globalName ?? discord.username ?? "")
+                                    .font(.headline)
+
+                                Text("@\(discord.username ?? "")")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
                         }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(discord.globalName ?? discord.username ?? "")
-                                .font(.headline)
-
-                            Text("@\(discord.username ?? "")")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                        .padding(.vertical, 4)
+                        .id("profile-\(refreshID)")
+                    } else {
+                        // Show loading view while waiting for user data
+                        HStack(spacing: 12) {
+                            Circle()
+                                .fill(.secondary.opacity(0.2))
+                                .frame(width: 48, height: 48)
+                                .overlay {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 8) {
+                                    Text("Loading account...")
+                                        .font(.headline)
+                                        .foregroundColor(.secondary)
+                                    ProgressView()
+                                        .controlSize(.small)
+                                }
+                                
+                                Text("Please wait...")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer()
                         }
-
-                        Spacer()
+                        .padding(.vertical, 4)
+                        .id("loading-\(refreshID)")
                     }
                     .padding(.vertical, 4)
                     .id("profile-\(viewModel.refreshID)")
@@ -793,6 +824,8 @@ private struct DiscordSettingsView: View {
                         
                         // Then initiate the authorization process
                         discord.authorize()
+                        // Start a refresh timer when authentication begins
+                        startRefreshTimer()
                     } label: {
                         Label("Connect Discord Account", systemImage: "person.badge.key.fill")
                     }
@@ -813,6 +846,8 @@ private struct DiscordSettingsView: View {
                         
                         // Then reconnect
                         discord.authorize()
+                        // Start a refresh timer when authentication begins
+                        startRefreshTimer()
                     } label: {
                         Label("Reconnect Account", systemImage: "arrow.clockwise")
                     }
