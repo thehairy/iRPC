@@ -699,26 +699,30 @@ private struct NowPlayingView: View {
     }
 }
 
+// Update DiscordSettingsView to use the ViewModel
 private struct DiscordSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     let discord: DiscordManager
     @Binding var isAuthenticating: Bool
     
-    // Add state properties to track authentication state and refresh view
-    @State private var refreshID = UUID()
-    @State private var wasAuthenticated = false
-    @State private var refreshSubscription: AnyCancellable?
+    // Replace state variables with a StateObject ViewModel
+    @StateObject private var viewModel: DiscordSettingsViewModel
     
-    // Add a computed property to check if user data is fully loaded
-    private var isUserDataLoaded: Bool {
-        discord.isAuthenticated && discord.username != nil
+    init(discord: DiscordManager, isAuthenticating: Binding<Bool>) {
+        self.discord = discord
+        self._isAuthenticating = isAuthenticating
+        // Initialize the ViewModel
+        self._viewModel = StateObject(wrappedValue: DiscordSettingsViewModel(
+            discord: discord,
+            isAuthenticating: isAuthenticating
+        ))
     }
 
     var body: some View {
         List {
             Section {
                 if discord.isAuthenticated {
-                    if isUserDataLoaded {
+                    if viewModel.isUserDataLoaded {
                         // Show user profile when data is loaded
                         HStack(spacing: 12) {
                             if let avatarURL = discord.avatarURL {
@@ -750,7 +754,7 @@ private struct DiscordSettingsView: View {
                             Spacer()
                         }
                         .padding(.vertical, 4)
-                        .id("profile-\(refreshID)")
+                        .id("profile-\(viewModel.refreshID)")
                     } else {
                         // Show loading view while waiting for user data
                         HStack(spacing: 12) {
@@ -779,14 +783,14 @@ private struct DiscordSettingsView: View {
                             Spacer()
                         }
                         .padding(.vertical, 4)
-                        .id("loading-\(refreshID)")
+                        .id("loading-\(viewModel.refreshID)")
                     }
                 } else {
                     Button {
                         isAuthenticating = true
                         discord.authorize()
-                        // Start observing auth changes when authentication begins
-                        startObservingAuthChanges()
+                        // Use ViewModel to start observing auth changes
+                        viewModel.startObservingAuthChanges()
                     } label: {
                         Label("Connect Discord Account", systemImage: "person.badge.key.fill")
                     }
@@ -799,8 +803,8 @@ private struct DiscordSettingsView: View {
                 Section {
                     Button(role: .destructive) {
                         discord.authorize()
-                        // Start observing auth changes when authentication begins
-                        startObservingAuthChanges()
+                        // Use ViewModel to start observing auth changes
+                        viewModel.startObservingAuthChanges()
                     } label: {
                         Label("Reconnect Account", systemImage: "arrow.clockwise")
                     }
@@ -812,87 +816,17 @@ private struct DiscordSettingsView: View {
         .navigationTitle("Discord Settings")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            // Store initial authentication state
-            wasAuthenticated = discord.isAuthenticated
-            
-            // If we're currently authenticating, start observing authentication state changes
-            if isAuthenticating {
-                startObservingAuthChanges()
-            }
+            // Let ViewModel check initial state
+            viewModel.checkInitialState()
         }
         .onChange(of: discord.isAuthenticated) { _, newValue in
-            // Delegate to focused function for better maintainability
-            handleAuthenticationStateChange(newValue)
+            // Delegate to ViewModel
+            viewModel.handleAuthenticationStateChange(newValue)
         }
         .onDisappear {
-            // Cleanup subscription when view disappears
-            cancelObservation()
+            // Use ViewModel to cleanup
+            viewModel.cancelObservation()
         }
-    }
-    
-    // Refactored into a focused function for better maintainability
-    private func handleAuthenticationStateChange(_ newAuthState: Bool) {
-        // Only process changes in authentication state
-        guard newAuthState != wasAuthenticated else { return }
-        
-        // Update tracking state
-        wasAuthenticated = newAuthState
-        
-        // Force view to refresh
-        refreshView()
-        
-        // Handle authentication completion
-        if newAuthState {
-            completeAuthentication()
-        }
-    }
-    
-    private func completeAuthentication() {
-        // Reset authenticating state
-        isAuthenticating = false
-        
-        // Cancel observation when authentication is complete
-        cancelObservation()
-        
-        // Perform one more refresh after a short delay to ensure user data is displayed
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            refreshView()
-        }
-    }
-    
-    private func refreshView() {
-        // Force view to refresh by changing the UUID
-        refreshID = UUID()
-    }
-    
-    private func startObservingAuthChanges() {
-        // Cancel any existing subscription
-        cancelObservation()
-        
-        // Use a Combine publisher to efficiently observe auth changes
-        // Check for changes less frequently (2 seconds) to reduce performance impact
-        refreshSubscription = Timer.publish(every: 2.0, on: .main, in: .common)
-            .autoconnect()
-            .sink { [self] _ in
-                // Only refresh the view while waiting for authentication
-                if !discord.isAuthenticated && isAuthenticating {
-                    refreshView()
-                } else if discord.isAuthenticated {
-                    // When authenticated, check if we have user data
-                    if isUserDataLoaded {
-                        // Stop observing once we have user data
-                        completeAuthentication()
-                    } else {
-                        // If authenticated but still missing user data, continue refreshing
-                        refreshView()
-                    }
-                }
-            }
-    }
-    
-    private func cancelObservation() {
-        refreshSubscription?.cancel()
-        refreshSubscription = nil
     }
 }
 
