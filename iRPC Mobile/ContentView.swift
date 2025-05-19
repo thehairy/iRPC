@@ -719,37 +719,8 @@ private struct DiscordSettingsView: View {
     var body: some View {
         List {
             Section {
-                // Modified display logic to show loading state immediately when authenticating
-                if isAuthenticating || (discord.isAuthenticated && !viewModel.isUserDataLoaded) {
-                    // Show loading view immediately when authenticating or waiting for user data
-                    HStack(spacing: 12) {
-                        Circle()
-                            .fill(.secondary.opacity(0.2))
-                            .frame(width: 48, height: 48)
-                            .overlay {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 8) {
-                                Text("Loading account...")
-                                    .font(.headline)
-                                    .foregroundColor(.secondary)
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                            
-                            Text("Please wait...")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        
-                        Spacer()
-                    }
-                    .padding(.vertical, 4)
-                    .id("loading-\(viewModel.refreshID)")
-                } else if discord.isAuthenticated && viewModel.isUserDataLoaded {
+                // Modified display logic to better handle cached user data
+                if discord.isAuthenticated && viewModel.isUserDataLoaded {
                     // Show user profile when data is fully loaded
                     HStack(spacing: 12) {
                         if let avatarURL = discord.avatarURL {
@@ -814,6 +785,35 @@ private struct DiscordSettingsView: View {
                     }
                     .padding(.vertical, 4)
                     .id("profile-\(viewModel.refreshID)")
+                } else if isAuthenticating || (discord.isAuthenticated && !viewModel.isUserDataLoaded) {
+                    // Show loading view when authenticating or waiting for user data
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(.secondary.opacity(0.2))
+                            .frame(width: 48, height: 48)
+                            .overlay {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                Text("Loading account...")
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                            
+                            Text("Please wait...")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.vertical, 4)
+                    .id("loading-\(viewModel.refreshID)")
                 } else {
                     // Show authenticate button only when not authenticating AND not authenticated
                     Button {
@@ -860,7 +860,7 @@ private struct DiscordSettingsView: View {
         .navigationTitle("Discord Settings")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            // Let ViewModel check initial state
+            // Check initial state immediately on appear
             viewModel.checkInitialState()
         }
         .onChange(of: discord.isAuthenticated) { _, newValue in

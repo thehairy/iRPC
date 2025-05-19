@@ -42,8 +42,23 @@ public class DiscordSettingsViewModel: ObservableObject {
     func checkInitialState() {
         wasAuthenticated = discord.isAuthenticated
         lastUsername = discord.username
+        
+        // Update user data loaded state
         updateUserDataLoadedState()
         
+        // If already authenticated and user data is available, mark as complete
+        if discord.isAuthenticated && discord.username != nil {
+            print("📱 ViewModel: Already authenticated with user data available")
+            isUserDataLoaded = true
+            
+            // If we were in authenticating state, complete it
+            if isAuthenticating.wrappedValue {
+                completeAuthentication()
+            }
+            return
+        }
+        
+        // If we're authenticating, start observing changes
         if isAuthenticating.wrappedValue {
             startObservingAuthChanges()
         }
@@ -126,6 +141,11 @@ public class DiscordSettingsViewModel: ObservableObject {
         if isUserDataLoaded != newState {
             print("📱 ViewModel: isUserDataLoaded changed from \(isUserDataLoaded) to \(newState)")
             isUserDataLoaded = newState
+            
+            // If user data is now loaded, update refresh ID to force UI update
+            if newState {
+                refreshView()
+            }
         }
     }
     
