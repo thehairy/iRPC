@@ -5,8 +5,6 @@
 //  Created by Adrian Castro on 8/5/25.
 //
 
-// ContentView.swift
-
 import Combine
 import DiscordSocialKit
 import NowPlayingKit
@@ -152,7 +150,6 @@ struct ContentView: View {
                 } header: {
                     Text("Discord Status")
                 } footer: {
-                    // Use ConnectionFooterView instead
                     ConnectionFooterView(
                         isAuthenticated: isDiscordAuthenticated,
                         isReady: isDiscordReady,
@@ -202,6 +199,13 @@ struct ContentView: View {
             print("🎵📣 System Music Player state changed!")
             handleMusicPlaybackStateChange()
         }
+        .task(id: "initializeMusic") {
+            if isAuthorized {
+                // Immediately try to show music content regardless of Discord status
+                print("🎵 Initializing music display")
+                await updateNowPlaying(forceRefresh: true)
+            }
+        }
         .task(priority: .high) {
             isLoading = true
             await MainActor.run {
@@ -219,7 +223,7 @@ struct ContentView: View {
             await requestAuthorization()
             if isAuthorized {
                 print("🎵 Music access authorized")
-                await updateNowPlaying()
+                await updateNowPlaying(forceRefresh: true)
             }
             isLoading = false
         }
@@ -252,7 +256,7 @@ struct ContentView: View {
             updateTrackedDiscordState()
         }
     }
-
+    
     private func setupMusicStatusObservers() {
         // Cancel any existing subscription
         playbackSubscription?.cancel()
@@ -392,7 +396,13 @@ struct ContentView: View {
         }
     }
 
-    private func updateNowPlaying() async {
+    private func updateNowPlaying(forceRefresh: Bool = false) async {
+        // Skip if we're not authorized yet
+        guard isAuthorized else {
+            print("⚠️ Music not authorized yet, skipping updateNowPlaying")
+            return
+        }
+        
         // Check if music is playing first
         if !manager.isPlaying {
             // Not playing, so attempt to show the last played song
@@ -415,8 +425,17 @@ struct ContentView: View {
                             duration: lastSong.duration ?? 0
                         )
                         
-                        if userEnabledRPC && discord.isAuthenticated {
-                            discord.clearPlayback()
+                        // Only update Discord presence if specifically enabled
+                        if userEnabledRPC && discord.isAuthenticated && discord.isReady {
+                            // Add a small delay to ensure Discord is ready
+                            if forceRefresh {
+                                Task {
+                                    try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                                    discord.clearPlayback()
+                                }
+                            } else {
+                                discord.clearPlayback()
+                            }
                         }
                     }
                 } else {
@@ -437,10 +456,12 @@ struct ContentView: View {
                 nowPlaying = newPlayback
                 print("🎵 Now Playing updated: \(newPlayback.title)")
 
-                if userEnabledRPC && discord.isAuthenticated && discord.isReady && manager.isPlaying {
+                // Only update Discord if specifically enabled
+                if userEnabledRPC && discord.isAuthenticated && discord.isReady {
                     updateDiscordDirectly(with: newPlayback)
                 }
 
+                // Always update toggle visibility based on current state
                 updateToggleVisibility()
             }
         } catch {
@@ -547,355 +568,5 @@ extension View {
         let minutes = Int(time) / 60
         let seconds = Int(time) % 60
         return String(format: "%02d:%02d", minutes, seconds)
-    }
-}
-
-// MARK: - Subviews
-private struct AuthorizationView: View {
-    let requestAuthorization: () async -> Void
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "music.note")
-                .font(.system(size: 60))
-                .foregroundStyle(.secondary)
-
-            Text("Music Access Required")
-                .font(.title2)
-                .bold()
-
-            Text(
-                "iRPC needs access to Apple Music to show your currently playing track in Discord."
-            )
-            .multilineTextAlignment(.center)
-            .foregroundStyle(.secondary)
-
-            Button(action: {
-                Task { await requestAuthorization() }
-            }) {
-                Text("Authorize Access")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .tint(.blue)
-            .controlSize(.large)
-            .padding(.top)
-        }
-        .padding()
-    }
-}
-
-private struct NowPlayingView: View {
-    let nowPlaying: NowPlayingData
-    let manager: NowPlayingManager
-    let isLastPlayed: Bool
-    
-    // Updated initializer with default parameter
-    init(nowPlaying: NowPlayingData, manager: NowPlayingManager, isLastPlayed: Bool = false) {
-        self.nowPlaying = nowPlaying
-        self.manager = manager
-        self.isLastPlayed = isLastPlayed
-    }
-
-    var body: some View {
-        Section {
-            if nowPlaying.title == "Loading..." {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .controlSize(.large)
-                    Text("Loading Music...")
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, minHeight: 200)
-            } else if nowPlaying.title == "No song playing" {
-                VStack(spacing: 16) {
-                    Image(systemName: "music.note.list")
-                        .font(.system(size: 50))
-                        .foregroundStyle(.secondary)
-                    
-                    Text("No Music Playing")
-                        .font(.title3)
-                        .bold()
-                    
-                    Text("Play a song to see it here")
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, minHeight: 200)
-            } else {
-                VStack(alignment: .center, spacing: 16) {
-                    // Show last played banner if applicable
-                    if isLastPlayed {
-                        HStack {
-                            Image(systemName: "clock.arrow.circlepath")
-                            Text("Last Played")
-                                .font(.caption)
-                                .bold()
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.secondary.opacity(0.2))
-                        .cornerRadius(20)
-                    }
-                    
-                    // ...existing artwork display code...
-                    if let artworkURL = nowPlaying.artworkURL {
-                        AsyncImage(url: artworkURL) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(height: 300)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            default:
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(.secondary.opacity(0.1))
-                                    .frame(height: 300)
-                                    .overlay {
-                                        ProgressView()
-                                    }
-                            }
-                        }
-                    }
-
-                    VStack(spacing: 8) {
-                        Text(nowPlaying.title)
-                            .font(.title3)
-                            .bold()
-                            .lineLimit(1)
-
-                        Text(nowPlaying.artist)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-
-                        if let album = nowPlaying.album {
-                            Text(album)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-
-                    // Only show progress if not showing last played
-                    if !isLastPlayed {
-                        VStack(spacing: 8) {
-                            ProgressView(value: nowPlaying.playbackTime, total: nowPlaying.duration)
-                                .tint(.blue)
-
-                            HStack {
-                                Text(formatTime(nowPlaying.playbackTime))
-                                Spacer()
-                                Text(formatTime(nowPlaying.duration))
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .listRowInsets(EdgeInsets())
-                .padding()
-            }
-        }
-    }
-}
-
-// Update DiscordSettingsView to improve authentication flow
-private struct DiscordSettingsView: View {
-    @Environment(\.dismiss) private var dismiss
-    let discord: DiscordManager
-    @Binding var isAuthenticating: Bool
-    
-    @StateObject private var viewModel: DiscordSettingsViewModel
-    
-    init(discord: DiscordManager, isAuthenticating: Binding<Bool>) {
-        self.discord = discord
-        self._isAuthenticating = isAuthenticating
-        self._viewModel = StateObject(wrappedValue: DiscordSettingsViewModel(
-            discord: discord,
-            isAuthenticating: isAuthenticating
-        ))
-    }
-
-    var body: some View {
-        List {
-            Section {
-                // Modified display logic to show loading state immediately when authenticating
-                if isAuthenticating || (discord.isAuthenticated && !viewModel.isUserDataLoaded) {
-                    // Show loading view immediately when authenticating or waiting for user data
-                    HStack(spacing: 12) {
-                        Circle()
-                            .fill(.secondary.opacity(0.2))
-                            .frame(width: 48, height: 48)
-                            .overlay {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 8) {
-                                Text("Loading account...")
-                                    .font(.headline)
-                                    .foregroundColor(.secondary)
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                            
-                            Text("Please wait...")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        
-                        Spacer()
-                    }
-                    .padding(.vertical, 4)
-                    .id("loading-\(viewModel.refreshID)")
-                } else if discord.isAuthenticated && viewModel.isUserDataLoaded {
-                    // Show user profile when data is fully loaded
-                    HStack(spacing: 12) {
-                        if let avatarURL = discord.avatarURL {
-                            AsyncImage(url: avatarURL) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 48, height: 48)
-                                        .clipShape(Circle())
-                                default:
-                                    Circle()
-                                        .fill(.secondary.opacity(0.2))
-                                        .frame(width: 48, height: 48)
-                                }
-                            }
-                        }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(discord.globalName ?? discord.username ?? "")
-                                .font(.headline)
-
-                            Text("@\(discord.username ?? "")")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-                    }
-                    .padding(.vertical, 4)
-                    .id("profile-\(viewModel.refreshID)")
-                } else {
-                    // Show authenticate button only when not authenticating AND not authenticated
-                    Button {
-                        // Set authenticating state BEFORE calling authorize
-                        isAuthenticating = true
-                        
-                        // Start observing authentication changes
-                        viewModel.startObservingAuthChanges()
-                        
-                        // Then initiate the authorization process
-                        discord.authorize()
-                    } label: {
-                        Label("Connect Discord Account", systemImage: "person.badge.key.fill")
-                    }
-                }
-            } header: {
-                Text("Account")
-            }
-
-            // Only show reconnect button when fully authenticated with user data
-            if discord.isAuthenticated && viewModel.isUserDataLoaded {
-                Section {
-                    Button(role: .destructive) {
-                        // Set authenticating state BEFORE reconnecting
-                        isAuthenticating = true
-                        
-                        // Start observing authentication changes
-                        viewModel.startObservingAuthChanges()
-                        
-                        // Then reconnect
-                        discord.authorize()
-                    } label: {
-                        Label("Reconnect Account", systemImage: "arrow.clockwise")
-                    }
-                } footer: {
-                    Text("Use this if you're having connection issues.")
-                }
-            }
-        }
-        .navigationTitle("Discord Settings")
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            // Let ViewModel check initial state
-            viewModel.checkInitialState()
-        }
-        .onChange(of: discord.isAuthenticated) { _, newValue in
-            if !newValue {
-                // If authorization is revoked/lost, make sure we're not in authenticating state
-                isAuthenticating = false
-            }
-            
-            // Delegate to ViewModel
-            viewModel.handleAuthenticationStateChange(newValue)
-        }
-        .onDisappear {
-            // Use ViewModel to cleanup
-            viewModel.cancelObservation()
-        }
-    }
-}
-
-private struct ConnectionStatusView: View {
-    let isAuthenticated: Bool
-    let isReady: Bool
-    let username: String?
-    
-    var body: some View {
-        HStack(spacing: 4) {
-            if !isAuthenticated {
-                Text("Not Connected")
-                    .foregroundStyle(.secondary)
-            } else if !isReady {
-                Text("Connecting")
-                    .foregroundStyle(.secondary)
-                ProgressView()
-                    .scaleEffect(0.7)
-            } else {
-                Text("Connected")
-                    .foregroundStyle(.green)
-                if let username = username {
-                    Text("as \(username)")
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-}
-
-private struct ConnectionFooterView: View {
-    let isAuthenticated: Bool
-    let isReady: Bool
-    let isPlaying: Bool
-    let showRPCToggle: Bool
-    let userEnabledRPC: Bool
-
-    var body: some View {
-        if !isAuthenticated {
-            Text("Sign in with Discord to share your music status.")
-        } else if !isReady {
-            Text("Establishing connection to Discord...")
-        } else {
-            if showRPCToggle {
-                if userEnabledRPC {
-                    if isPlaying {
-                        Text("Sharing your music status on Discord.")
-                    } else {
-                        Text("Waiting for music to play...")
-                    }
-                } else {
-                    Text("Enable Rich Presence to share your music status.")
-                }
-            } else {
-                Text("Start playing music to enable Rich Presence.")
-            }
-        }
     }
 }
