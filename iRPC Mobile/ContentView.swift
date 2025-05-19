@@ -703,45 +703,90 @@ private struct DiscordSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     let discord: DiscordManager
     @Binding var isAuthenticating: Bool
+    
+    // Add state properties to track authentication state and refresh view
+    @State private var refreshID = UUID()
+    @State private var wasAuthenticated = false
+    @State private var refreshTimer: Timer?
+    
+    // Add a computed property to check if user data is fully loaded
+    private var isUserDataLoaded: Bool {
+        discord.isAuthenticated && discord.username != nil
+    }
 
     var body: some View {
         List {
             Section {
                 if discord.isAuthenticated {
-                    HStack(spacing: 12) {
-                        if let avatarURL = discord.avatarURL {
-                            AsyncImage(url: avatarURL) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 48, height: 48)
-                                        .clipShape(Circle())
-                                default:
-                                    Circle()
-                                        .fill(.secondary.opacity(0.2))
-                                        .frame(width: 48, height: 48)
+                    if isUserDataLoaded {
+                        // Show user profile when data is loaded
+                        HStack(spacing: 12) {
+                            if let avatarURL = discord.avatarURL {
+                                AsyncImage(url: avatarURL) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 48, height: 48)
+                                            .clipShape(Circle())
+                                    default:
+                                        Circle()
+                                            .fill(.secondary.opacity(0.2))
+                                            .frame(width: 48, height: 48)
+                                    }
                                 }
                             }
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(discord.globalName ?? discord.username ?? "")
+                                    .font(.headline)
+
+                                Text("@\(discord.username ?? "")")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
                         }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(discord.globalName ?? discord.username ?? "")
-                                .font(.headline)
-
-                            Text("@\(discord.username ?? "")")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                        .padding(.vertical, 4)
+                        .id("profile-\(refreshID)")
+                    } else {
+                        // Show loading view while waiting for user data
+                        HStack(spacing: 12) {
+                            Circle()
+                                .fill(.secondary.opacity(0.2))
+                                .frame(width: 48, height: 48)
+                                .overlay {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 8) {
+                                    Text("Loading account...")
+                                        .font(.headline)
+                                        .foregroundColor(.secondary)
+                                    ProgressView()
+                                        .controlSize(.small)
+                                }
+                                
+                                Text("Please wait...")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer()
                         }
-
-                        Spacer()
+                        .padding(.vertical, 4)
+                        .id("loading-\(refreshID)")
                     }
-                    .padding(.vertical, 4)
                 } else {
                     Button {
                         isAuthenticating = true
                         discord.authorize()
+                        // Start a refresh timer when authentication begins
+                        startRefreshTimer()
                     } label: {
                         Label("Connect Discord Account", systemImage: "person.badge.key.fill")
                     }
@@ -754,6 +799,8 @@ private struct DiscordSettingsView: View {
                 Section {
                     Button(role: .destructive) {
                         discord.authorize()
+                        // Start a refresh timer when authentication begins
+                        startRefreshTimer()
                     } label: {
                         Label("Reconnect Account", systemImage: "arrow.clockwise")
                     }
@@ -764,6 +811,60 @@ private struct DiscordSettingsView: View {
         }
         .navigationTitle("Discord Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            // Store initial authentication state
+            wasAuthenticated = discord.isAuthenticated
+            
+            // If we're currently authenticating, start the refresh timer
+            if isAuthenticating {
+                startRefreshTimer()
+            }
+        }
+        .onChange(of: discord.isAuthenticated) { _, newValue in
+            // When authentication state changes, refresh the view
+            if newValue != wasAuthenticated {
+                wasAuthenticated = newValue
+                refreshView()
+                
+                // If no longer authenticating, cancel the timer
+                if newValue {
+                    isAuthenticating = false
+                    stopRefreshTimer()
+                }
+            }
+        }
+        .onDisappear {
+            // Cleanup timer when view disappears
+            stopRefreshTimer()
+        }
+    }
+    
+    private func refreshView() {
+        // Force view to refresh by changing the UUID
+        refreshID = UUID()
+    }
+    
+    private func startRefreshTimer() {
+        // Cancel any existing timer
+        stopRefreshTimer()
+        
+        // Create a timer that refreshes the view every second during authentication
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            DispatchQueue.main.async {
+                refreshView()
+                
+                // If we're authenticated, stop the timer
+                if discord.isAuthenticated {
+                    isAuthenticating = false
+                    stopRefreshTimer()
+                }
+            }
+        }
+    }
+    
+    private func stopRefreshTimer() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
 }
 
