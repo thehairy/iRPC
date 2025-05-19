@@ -780,7 +780,7 @@ private struct DiscordSettingsView: View {
                             Spacer()
                         }
                         .padding(.vertical, 4)
-                        .id("profile-\(refreshID)")
+                        .id("profile-\(viewModel.refreshID)")
                     } else {
                         // Show loading view while waiting for user data
                         HStack(spacing: 12) {
@@ -809,7 +809,7 @@ private struct DiscordSettingsView: View {
                             Spacer()
                         }
                         .padding(.vertical, 4)
-                        .id("loading-\(refreshID)")
+                        .id("loading-\(viewModel.refreshID)")
                     }
                     .padding(.vertical, 4)
                     .id("profile-\(viewModel.refreshID)")
@@ -824,8 +824,8 @@ private struct DiscordSettingsView: View {
                         
                         // Then initiate the authorization process
                         discord.authorize()
-                        // Start observing auth changes when authentication begins
-                        startObservingAuthChanges()
+                        // Use ViewModel to start observing auth changes
+                        viewModel.startObservingAuthChanges()
                     } label: {
                         Label("Connect Discord Account", systemImage: "person.badge.key.fill")
                     }
@@ -846,8 +846,8 @@ private struct DiscordSettingsView: View {
                         
                         // Then reconnect
                         discord.authorize()
-                        // Start observing auth changes when authentication begins
-                        startObservingAuthChanges()
+                        // Use ViewModel to start observing auth changes
+                        viewModel.startObservingAuthChanges()
                     } label: {
                         Label("Reconnect Account", systemImage: "arrow.clockwise")
                     }
