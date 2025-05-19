@@ -824,8 +824,8 @@ private struct DiscordSettingsView: View {
                         
                         // Then initiate the authorization process
                         discord.authorize()
-                        // Start a refresh timer when authentication begins
-                        startRefreshTimer()
+                        // Start observing auth changes when authentication begins
+                        startObservingAuthChanges()
                     } label: {
                         Label("Connect Discord Account", systemImage: "person.badge.key.fill")
                     }
@@ -846,8 +846,8 @@ private struct DiscordSettingsView: View {
                         
                         // Then reconnect
                         discord.authorize()
-                        // Start a refresh timer when authentication begins
-                        startRefreshTimer()
+                        // Start observing auth changes when authentication begins
+                        startObservingAuthChanges()
                     } label: {
                         Label("Reconnect Account", systemImage: "arrow.clockwise")
                     }
