@@ -8,10 +8,33 @@
 import SwiftUI
 import NowPlayingKit
 
+public enum PlaybackDisplayState {
+    case loading
+    case noMusic
+    case playing(NowPlayingData)
+    
+    // Determine state based on NowPlayingData
+    static func from(nowPlaying: NowPlayingData) -> PlaybackDisplayState {
+        switch nowPlaying.title {
+        case "Loading...":
+            return .loading
+        case "No song playing":
+            return .noMusic
+        default:
+            return .playing(nowPlaying)
+        }
+    }
+}
+
 public struct NowPlayingView: View {
     let nowPlaying: NowPlayingData
     let manager: NowPlayingManager
     let isLastPlayed: Bool
+    
+    // Compute the display state from data
+    private var displayState: PlaybackDisplayState {
+        return PlaybackDisplayState.from(nowPlaying: nowPlaying)
+    }
     
     // Updated initializer with default parameter
     public init(nowPlaying: NowPlayingData, manager: NowPlayingManager, isLastPlayed: Bool = false) {
@@ -22,101 +45,130 @@ public struct NowPlayingView: View {
 
     public var body: some View {
         Section {
-            if nowPlaying.title == "Loading..." {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .controlSize(.large)
-                    Text("Loading Music...")
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, minHeight: 200)
-            } else if nowPlaying.title == "No song playing" {
-                VStack(spacing: 16) {
-                    Image(systemName: "music.note.list")
-                        .font(.system(size: 50))
-                        .foregroundStyle(.secondary)
-                    
-                    Text("No Music Playing")
-                        .font(.title3)
-                        .bold()
-                    
-                    Text("Play a song to see it here")
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, minHeight: 200)
-            } else {
-                VStack(alignment: .center, spacing: 16) {
-                    // Show last played banner if applicable
-                    if isLastPlayed {
-                        HStack {
-                            Image(systemName: "clock.arrow.circlepath")
-                            Text("Last Played")
-                                .font(.caption)
-                                .bold()
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.secondary.opacity(0.2))
-                        .cornerRadius(20)
-                    }
-                    
-                    if let artworkURL = nowPlaying.artworkURL {
-                        AsyncImage(url: artworkURL) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(height: 300)
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            default:
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(.secondary.opacity(0.1))
-                                    .frame(height: 300)
-                                    .overlay {
-                                        ProgressView()
-                                    }
-                            }
-                        }
-                    }
-
-                    VStack(spacing: 8) {
-                        Text(nowPlaying.title)
-                            .font(.title3)
-                            .bold()
-                            .lineLimit(1)
-
-                        Text(nowPlaying.artist)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-
-                        if let album = nowPlaying.album {
-                            Text(album)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-
-                    // Only show progress if not showing last played
-                    if !isLastPlayed {
-                        VStack(spacing: 8) {
-                            ProgressView(value: nowPlaying.playbackTime, total: nowPlaying.duration)
-                                .tint(.blue)
-
-                            HStack {
-                                Text(formatTime(nowPlaying.playbackTime))
-                                Spacer()
-                                Text(formatTime(nowPlaying.duration))
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .listRowInsets(EdgeInsets())
-                .padding()
+            switch displayState {
+            case .loading:
+                LoadingView()
+            case .noMusic:
+                EmptyMusicStateView()
+            case .playing(let data):
+                PlayingContentView(nowPlaying: data, isLastPlayed: isLastPlayed)
             }
+        }
+    }
+    
+    private func LoadingView() -> some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .controlSize(.large)
+            Text("Loading Music...")
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 200)
+    }
+    
+    private func EmptyMusicStateView() -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "music.note.list")
+                .font(.system(size: 50))
+                .foregroundStyle(.secondary)
+            
+            Text("No Music Playing")
+                .font(.title3)
+                .bold()
+            
+            Text("Play a song to see it here")
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 200)
+    }
+    
+    private func PlayingContentView(nowPlaying: NowPlayingData, isLastPlayed: Bool) -> some View {
+        VStack(alignment: .center, spacing: 16) {
+            // Show last played banner if applicable
+            if isLastPlayed {
+                LastPlayedBadge()
+            }
+            
+            if let artworkURL = nowPlaying.artworkURL {
+                ArtworkView(url: artworkURL)
+            }
+            
+            SongInfoView(title: nowPlaying.title, artist: nowPlaying.artist, album: nowPlaying.album)
+            
+            // Only show progress if not showing last played
+            if !isLastPlayed {
+                PlaybackProgressView(playbackTime: nowPlaying.playbackTime, duration: nowPlaying.duration)
+            }
+        }
+        .listRowInsets(EdgeInsets())
+        .padding()
+    }
+    
+    private func LastPlayedBadge() -> some View {
+        HStack {
+            Image(systemName: "clock.arrow.circlepath")
+            Text("Last Played")
+                .font(.caption)
+                .bold()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.2))
+        .cornerRadius(20)
+    }
+    
+    private func ArtworkView(url: URL) -> some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: 300)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            default:
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.secondary.opacity(0.1))
+                    .frame(height: 300)
+                    .overlay {
+                        ProgressView()
+                    }
+            }
+        }
+    }
+    
+    private func SongInfoView(title: String, artist: String, album: String?) -> some View {
+        VStack(spacing: 8) {
+            Text(title)
+                .font(.title3)
+                .bold()
+                .lineLimit(1)
+            
+            Text(artist)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            
+            if let album = album {
+                Text(album)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+    
+    private func PlaybackProgressView(playbackTime: TimeInterval, duration: TimeInterval) -> some View {
+        VStack(spacing: 8) {
+            ProgressView(value: playbackTime, total: duration)
+                .tint(.blue)
+            
+            HStack {
+                Text(formatTime(playbackTime))
+                Spacer()
+                Text(formatTime(duration))
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
     }
     
