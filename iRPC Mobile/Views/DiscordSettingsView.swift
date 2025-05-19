@@ -62,7 +62,7 @@ public struct DiscordSettingsView: View {
                         Spacer()
                     }
                     .padding(.vertical, 4)
-                    .id("profile-\(viewModel.refreshID)")
+                    .id(viewModel.refreshID)
                 } else if isAuthenticating || (discord.isAuthenticated && !viewModel.isUserDataLoaded) {
                     // Show loading view when authenticating or waiting for user data
                     HStack(spacing: 12) {
